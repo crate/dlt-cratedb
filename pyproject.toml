@@ -1,0 +1,273 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [
+  "setuptools>=42", # At least v42 of setuptools required.
+  "versioningit",
+]
+
+[project]
+name = "dlt-cratedb"
+description = "dlt destination adapter for CrateDB"
+readme = "README.md"
+keywords = [
+  "CrateDB",
+  "data",
+  "destination",
+  "dlt",
+  "elt",
+  "etl",
+  "i/o",
+  "postgresql",
+  "sql",
+]
+license = "Apache-2.0"
+license-files = [ "LICENSE.txt" ]
+authors = [
+  { name = "Andreas Motl", email = "andreas.motl@crate.io" },
+]
+requires-python = ">=3.9"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Plugins",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Education",
+  "Intended Audience :: Information Technology",
+  "Intended Audience :: Manufacturing",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: System Administrators",
+  "Intended Audience :: Telecommunications Industry",
+  "Operating System :: OS Independent",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: Unix",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+  "Programming Language :: SQL",
+  "Topic :: Adaptive Technologies",
+  "Topic :: Communications",
+  "Topic :: Database",
+  "Topic :: Documentation",
+  "Topic :: Education",
+  "Topic :: Internet",
+  "Topic :: Office/Business",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+  "Topic :: Scientific/Engineering :: Interface Engine/Protocol Translator",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: Software Development :: Pre-processors",
+  "Topic :: Software Development :: Testing",
+  "Topic :: Software Development :: Version Control",
+  "Topic :: System :: Archiving",
+  "Topic :: System :: Benchmark",
+  "Topic :: System :: Clustering",
+  "Topic :: System :: Distributed Computing",
+  "Topic :: System :: Logging",
+  "Topic :: System :: Monitoring",
+  "Topic :: System :: Networking",
+  "Topic :: System :: Systems Administration",
+  "Topic :: Text Processing",
+  "Topic :: Utilities",
+]
+dynamic = [
+  "version",
+]
+dependencies = [
+  "dlt[postgres]",
+]
+optional-dependencies.develop = [
+  "mypy>=1.11,<1.13",
+  "poethepoet<1",
+  "pyproject-fmt<3",
+  "ruff<0.6",
+  "validate-pyproject>=0.23,<1",
+]
+optional-dependencies.release = [
+  "build<2",
+  "twine<6",
+]
+optional-dependencies.test = [
+  "duckdb",
+  "pytest<9",
+  "pytest-cov<6",
+  #"pytest-mock<4",
+  "sqlfluff<2.4",
+]
+
+urls.Changelog = "https://github.com/crate-workbench/dlt-cratedb/blob/main/CHANGES.md"
+urls.Documentation = "https://github.com/crate-workbench/dlt-cratedb/tree/main/docs"
+urls.Issues = "https://github.com/crate-workbench/dlt-cratedb/issues"
+urls.Repository = "https://github.com/crate-workbench/dlt-cratedb"
+
+[tool.ruff]
+
+line-length = 100
+
+extend-exclude = [
+]
+
+lint.select = [
+  # Builtins
+  "A",
+  # Bugbear
+  "B",
+  # comprehensions
+  "C4",
+  # Pycodestyle
+  "E",
+  # eradicate
+  "ERA",
+  # Pyflakes
+  "F",
+  # isort
+  "I",
+  # pandas-vet
+  "PD",
+  # return
+  "RET",
+  # Bandit
+  "S",
+  # print
+  "T20",
+  "W",
+  # flake8-2020
+  "YTT",
+]
+
+lint.extend-ignore = [
+  # set-attr-with-constant
+  "B010",
+  # zip() without an explicit strict= parameter
+  "B905",
+  # Unnecessary `dict` call (rewrite as a literal)
+  "C408",
+  # df is a bad variable name. Be kinder to your future self.
+  "PD901",
+  # Unnecessary variable assignment before `return` statement
+  "RET504",
+  # Unnecessary `elif` after `return` statement
+  "RET505",
+  # Probable insecure usage of temporary file or directory
+  "S108",
+]
+
+lint.per-file-ignores."examples/*" = [
+  "ERA001", # Found commented-out code
+  "T201",   # Allow `print`
+  "T203",   # Allow `pprint`
+]
+
+lint.per-file-ignores."tests/*" = [
+  "E501",   # Line too long
+  "ERA001", # Found commented-out code
+  "S101",   # Allow use of `assert`, and `print`.
+  "S105",   # Possible hardcoded password assigned to: "password".
+  "S311",   # Standard pseudo-random generators are not suitable for cryptographic purposes
+  "S608",   # Possible SQL injection vector through string-based query construction
+]
+
+[tool.pytest.ini_options]
+addopts = """
+  -rfEXs -p pytester --strict-markers --verbosity=3
+  --cov --cov-report=term-missing --cov-report=xml
+  """
+minversion = "2.0"
+log_level = "DEBUG"
+log_cli_level = "DEBUG"
+log_format = "%(asctime)-15s [%(name)-36s] %(levelname)-8s: %(message)s"
+pythonpath = [
+  "src",
+]
+testpaths = [
+  "tests",
+]
+xfail_strict = true
+markers = [
+]
+
+[tool.coverage.paths]
+source = [
+  "src/",
+]
+
+[tool.coverage.run]
+branch = false
+omit = [
+  "tests/*",
+]
+
+[tool.coverage.report]
+fail_under = 0
+show_missing = true
+exclude_lines = [
+  "# pragma: no cover",
+  "raise NotImplemented",
+]
+
+[tool.mypy]
+mypy_path = "src"
+packages = [
+  "dlt_cratedb",
+]
+exclude = [
+]
+python_version = "3.10"
+ignore_missing_imports = false
+strict_optional = false
+warn_redundant_casts = true
+disallow_any_generics = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+warn_return_any = true
+namespace_packages = true
+warn_unused_ignores = true
+show_error_codes = true
+install_types = true
+non_interactive = true
+explicit_package_bases = true
+implicit_optional = true
+
+[tool.versioningit.vcs]
+method = "git-archive"
+default-tag = "v0.0.0"
+describe-subst = "$Format:%(describe:tags,match=v*)$"
+
+# ===================
+# Tasks configuration
+# ===================
+
+[tool.poe.tasks]
+
+check = [
+  "lint",
+  "test",
+]
+
+format = [
+  { cmd = "ruff format ." },
+  # Configure Ruff not to auto-fix (remove!):
+  # unused imports (F401), unused variables (F841), `print` statements (T201), and commented-out code (ERA001).
+  { cmd = "ruff check --fix --ignore=ERA --ignore=F401 --ignore=F841 --ignore=T20 --ignore=ERA001 ." },
+  { cmd = "pyproject-fmt --keep-full-version pyproject.toml" },
+]
+
+lint = [
+  { cmd = "ruff format --check ." },
+  { cmd = "ruff check ." },
+  { cmd = "validate-pyproject pyproject.toml" },
+  { cmd = "mypy" },
+]
+
+release = [
+  { cmd = "python -m build" },
+  { cmd = "twine upload --skip-existing dist/*" },
+]
+
+test = [
+  { cmd = "pytest" },
+]
