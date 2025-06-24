@@ -105,7 +105,7 @@ class CrateDbSqlClient(Psycopg2SqlClient):
         with self._conn.cursor() as curr:
             try:
                 curr.execute(query, db_args)
-                yield CrateDbApiCursorImpl(curr)
+                yield CrateDbApiCursorImpl(curr)  # type: ignore[abstract]
             except psycopg2.Error as outer:
                 try:
                     self._reset_connection()
