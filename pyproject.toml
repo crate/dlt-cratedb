@@ -96,7 +96,7 @@ optional-dependencies.test = [
   "pytest<9",
   "pytest-cov<6",
   #"pytest-mock<4",
-  "sqlfluff<2.4",
+  "sqlfluff<3.5",
 ]
 
 urls.Changelog = "https://github.com/crate-workbench/dlt-cratedb/blob/main/CHANGES.md"
