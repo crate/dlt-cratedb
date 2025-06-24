@@ -89,7 +89,7 @@ optional-dependencies.develop = [
 ]
 optional-dependencies.release = [
   "build<2",
-  "twine<6",
+  "twine<7",
 ]
 optional-dependencies.test = [
   "duckdb",
