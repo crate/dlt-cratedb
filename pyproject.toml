@@ -89,13 +89,12 @@ optional-dependencies.develop = [
 ]
 optional-dependencies.release = [
   "build<2",
-  "twine<6",
+  "twine>=6,<7",
 ]
 optional-dependencies.test = [
   "duckdb",
   "pytest<9",
   "pytest-cov<6",
-  #"pytest-mock<4",
   "sqlfluff<2.4",
 ]
 
