@@ -106,7 +106,7 @@ class CrateDbClient(PostgresClient):
     ) -> List[FollowupJobRequest]:
         """
         CrateDB currently does not support "merge" followup jobs.
-        -- https://github.com/crate-workbench/dlt/issues/4
+        -- https://github.com/crate/dlt-cratedb/issues/6
 
         Workaround: Redirect the "merge" job to use a "replace" job instead.
         """

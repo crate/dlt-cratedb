@@ -98,10 +98,10 @@ optional-dependencies.test = [
   "sqlfluff<2.4",
 ]
 
-urls.Changelog = "https://github.com/crate-workbench/dlt-cratedb/blob/main/CHANGES.md"
-urls.Documentation = "https://github.com/crate-workbench/dlt-cratedb/tree/main/docs"
-urls.Issues = "https://github.com/crate-workbench/dlt-cratedb/issues"
-urls.Repository = "https://github.com/crate-workbench/dlt-cratedb"
+urls.Changelog = "https://github.com/crate/dlt-cratedb/blob/main/CHANGES.md"
+urls.Documentation = "https://github.com/crate/dlt-cratedb/tree/main/docs"
+urls.Issues = "https://github.com/crate/dlt-cratedb/issues"
+urls.Repository = "https://github.com/crate/dlt-cratedb"
 
 [tool.ruff]
 
