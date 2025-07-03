@@ -38,8 +38,8 @@ Please refer to the [handbook].
 
 ## Backlog
 
-We are tracking corresponding [issues] on the dlt fork project.
-A few more [backlog] items also need to be resolved.
+We are tracking corresponding [issues] and a few more [backlog] items
+to be resolved as we go.
 
 
 [backlog]: docs/backlog.md
@@ -47,7 +47,7 @@ A few more [backlog] items also need to be resolved.
 [dlt]: https://github.com/dlt-hub/dlt
 [DLT-2733]: https://github.com/dlt-hub/dlt/pull/2733
 [dlt-cratedb]: https://pypi.org/project/dlt-cratedb
-[issues]: https://github.com/crate/dlt/issues
+[issues]: https://github.com/crate/dlt-cratedb/issues
 [handbook]: docs/cratedb.md
 
 [CrateDB]: https://cratedb.com/database
