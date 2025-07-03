@@ -42,13 +42,13 @@ We are tracking corresponding [issues] and a few more [backlog] items
 to be resolved as we go.
 
 
-[backlog]: docs/backlog.md
+[backlog]: https://github.com/crate/dlt-cratedb/blob/main/docs/backlog.md
 [CRATEDB-15161]: https://github.com/crate/crate/issues/15161
 [dlt]: https://github.com/dlt-hub/dlt
 [DLT-2733]: https://github.com/dlt-hub/dlt/pull/2733
 [dlt-cratedb]: https://pypi.org/project/dlt-cratedb
 [issues]: https://github.com/crate/dlt-cratedb/issues
-[handbook]: docs/cratedb.md
+[handbook]: https://github.com/crate/dlt-cratedb/blob/main/docs/cratedb.md
 
 [CrateDB]: https://cratedb.com/database
 [Bluesky]: https://bsky.app/search?q=cratedb
