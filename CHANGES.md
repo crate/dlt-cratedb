@@ -7,4 +7,4 @@
 - Satisfied `mypy` type checker
 
 ## 2025/06/24 v0.0.0
-- Start of project, derived from https://github.com/dlt-hub/dlt/pull/2733
+- Started the project, derived from https://github.com/dlt-hub/dlt/pull/2733
