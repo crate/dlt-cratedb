@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+
+## 2025/07/07 v0.0.2
 - ingestr: Fixed importing from Kafka per `SystemColumnWorkaround`
 
 ## 2025/06/24 v0.0.1
