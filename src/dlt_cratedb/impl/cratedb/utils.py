@@ -68,11 +68,16 @@ class SystemColumnWorkaround:
     """
 
     quirked_labels = [
+        # dlt core
         "__dlt_id",
         "__dlt_load_id",
         "__dlt_parent_id",
         "__dlt_list_idx",
         "__dlt_root_id",
+        # ingestr kafka
+        "_kafka__msg_id",
+        # ingestr mongodb
+        # "__id",
     ]
 
     @staticmethod
@@ -83,6 +88,7 @@ class SystemColumnWorkaround:
             .replace("_dlt_parent_id", "__dlt_parent_id")
             .replace("_dlt_list_idx", "__dlt_list_idx")
             .replace("_dlt_root_id", "__dlt_root_id")
+            .replace("_kafka_msg_id", "_kafka__msg_id")
         )
         return thing
 
@@ -94,6 +100,7 @@ class SystemColumnWorkaround:
             .replace("__dlt_parent_id", "_dlt_parent_id")
             .replace("__dlt_list_idx", "_dlt_list_idx")
             .replace("__dlt_root_id", "_dlt_root_id")
+            .replace("_kafka__msg_id", "_kafka_msg_id")
         )
         return thing
 

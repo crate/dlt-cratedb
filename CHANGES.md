@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- ingestr: Fixed importing from Kafka per `SystemColumnWorkaround`
 
 ## 2025/06/24 v0.0.1
 - Fixed mypy error `missing library stubs or py.typed marker`
