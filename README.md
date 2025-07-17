@@ -61,7 +61,7 @@ to be resolved as we go.
 [Releases]: https://github.com/surister/dlt-cratedb/releases
 
 [badge-ci]: https://github.com/crate/dlt-cratedb/actions/workflows/tests.yml/badge.svg
-[badge-dlt-versions]: https://img.shields.io/badge/dlt-1.10%2C%201.11%2C%201.12-blue.svg
+[badge-dlt-versions]: https://img.shields.io/badge/dlt-1.10%20--%201.14-blue.svg
 [badge-bluesky]: https://img.shields.io/badge/Bluesky-0285FF?logo=bluesky&logoColor=fff&label=Follow%20%40CrateDB
 [badge-coverage]: https://codecov.io/gh/crate/dlt-cratedb/branch/main/graph/badge.svg
 [badge-downloads-per-month]: https://pepy.tech/badge/dlt-cratedb/month
