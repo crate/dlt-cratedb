@@ -81,7 +81,7 @@ dependencies = [
   "dlt[postgres]",
 ]
 optional-dependencies.develop = [
-  "mypy>=1.11,<1.18",
+  "mypy>=1.11,<1.19",
   "poethepoet<1",
   "pyproject-fmt<3",
   "ruff<0.6",
