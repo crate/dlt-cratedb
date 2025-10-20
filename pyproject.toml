@@ -95,7 +95,7 @@ optional-dependencies.test = [
   "duckdb",
   "pytest<9",
   "pytest-cov<8",
-  "sqlfluff<2.4",
+  "sqlfluff<3.6",
 ]
 
 urls.Changelog = "https://github.com/crate/dlt-cratedb/blob/main/CHANGES.md"
