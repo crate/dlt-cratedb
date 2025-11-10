@@ -6,6 +6,7 @@ import sqlfluff
 from dlt.common.exceptions import TerminalValueError
 from dlt.common.schema import Schema, utils
 from dlt.common.utils import uniq_id
+
 from dlt_cratedb.impl.cratedb.configuration import (
     CrateDbClientConfiguration,
     CrateDbCredentials,
@@ -14,7 +15,6 @@ from dlt_cratedb.impl.cratedb.cratedb import (
     CrateDbClient,
 )
 from dlt_cratedb.impl.cratedb.factory import cratedb
-
 from tests.cases import (
     TABLE_UPDATE,
     TABLE_UPDATE_ALL_INT_PRECISIONS,

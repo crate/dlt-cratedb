@@ -1,4 +1,5 @@
 import pytest
+
 from dlt_cratedb.impl.cratedb.configuration import CrateDbCredentials
 
 
