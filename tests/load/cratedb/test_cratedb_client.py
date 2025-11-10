@@ -7,9 +7,9 @@ from dlt.common.configuration.resolve import (
     resolve_configuration,
 )
 from dlt.common.storages import FileStorage
+
 from dlt_cratedb.impl.cratedb.configuration import CrateDbCredentials
 from dlt_cratedb.impl.cratedb.cratedb import CrateDbClient
-
 from tests.load.utils import yield_client_with_storage
 from tests.utils import TEST_STORAGE_ROOT, delete_test_storage
 

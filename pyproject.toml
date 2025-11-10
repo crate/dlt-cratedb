@@ -46,6 +46,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
   "Programming Language :: SQL",
@@ -145,8 +146,6 @@ lint.extend-ignore = [
   "B905",
   # Unnecessary `dict` call (rewrite as a literal)
   "C408",
-  # df is a bad variable name. Be kinder to your future self.
-  "PD901",
   # Unnecessary variable assignment before `return` statement
   "RET504",
   # Unnecessary `elif` after `return` statement

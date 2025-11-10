@@ -1,4 +1,4 @@
-import datetime  # noqa: I251
+import datetime
 from os import environ
 from typing import (
     Any,
