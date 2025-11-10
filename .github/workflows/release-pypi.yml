@@ -18,6 +18,10 @@ on:
   # Allow the job to be triggered manually.
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-publish:
     name: "Build and publish to PyPI"
