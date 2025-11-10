@@ -14,7 +14,6 @@ jobs:
 
   test:
     name: "
-    dlt ${{ matrix.dlt-version }}
     Python ${{ matrix.python-version }}
     "
     runs-on: ${{ matrix.os }}
@@ -25,13 +24,6 @@ jobs:
         python-version: [
           '3.9',
           '3.13',
-        ]
-        dlt-version: [
-          '1.10.*',
-          '1.11.*',
-          '1.12.*',
-          '1.13.*',
-          '1.14.*',
         ]
 
     env:
@@ -60,7 +52,6 @@ jobs:
 
       - name: Set up project
         run: |
-          uv pip install 'dlt[postgres]==${{ matrix.dlt-version }}'
           uv pip install --editable='.[develop,test]'
 
       - name: Set timezone
