@@ -79,7 +79,7 @@ dynamic = [
   "version",
 ]
 dependencies = [
-  "dlt[postgres]",
+  "dlt[postgres]<1.18",
 ]
 optional-dependencies.develop = [
   "mypy>=1.11,<1.19",
