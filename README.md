@@ -25,6 +25,8 @@
 The [dlt-cratedb] package is temporary for shipping the code until
 [DLT-2733] is ready for upstreaming into main [dlt].
 
+Operating the package successfully needs CrateDB 6.2 or higher.
+
 ## Documentation
 
 Please refer to the [handbook].
@@ -33,8 +35,7 @@ Please refer to the [handbook].
 
 - The `cratedb` adapter is heavily based on the `postgres` adapter.
 - The `CrateDbSqlClient` deviates from the original `Psycopg2SqlClient` by
-  accounting for [CRATEDB-15161] per `SystemColumnWorkaround`.
-- A few more other patches.
+  adding a few CrateDB-specific adjustments.
 
 ## Backlog
 
