@@ -1,13 +1,8 @@
 import json
-import platform
 from datetime import date, datetime, time
-from typing import Any, Optional, Sequence, Union
+from typing import Any
 
 from dlt.common.data_writers.escape import _escape_extended, _make_sql_escape_re
-
-if platform.python_implementation() == "PyPy":
-    import psycopg2cffi as psycopg2  # type: ignore[import-not-found]
-import psycopg2.sql
 
 # CrateDB does not accept the original `{"'": "''", "\\": "\\\\", "\n": "\\n", "\r": "\\r"}`?
 SQL_ESCAPE_DICT = {"'": "''"}
@@ -49,80 +44,3 @@ def escape_cratedb_literal(v: Any) -> Any:
         return "NULL"
 
     return str(v)
-
-
-class SystemColumnWorkaround:
-    """
-    CrateDB reserves `_`-prefixed column names for internal purposes.
-
-    When approaching CrateDB with such private columns which are common in
-    ETL frameworks, a corresponding error will be raised.
-
-        InvalidColumnNameException["_dlt_load_id" conflicts with system column pattern]
-
-    This class provides utility methods to work around the problem, brutally.
-
-    See also: https://github.com/crate/crate/issues/15161
-
-    FIXME: Please get rid of this code by resolving the issue in CrateDB.
-    """
-
-    quirked_labels = [
-        # dlt core
-        "__dlt_id",
-        "__dlt_load_id",
-        "__dlt_parent_id",
-        "__dlt_list_idx",
-        "__dlt_root_id",
-        # ingestr kafka
-        "_kafka__msg_id",
-        # ingestr mongodb
-        # "__id",
-    ]
-
-    @staticmethod
-    def quirk(thing: str) -> str:
-        thing = (
-            thing.replace("_dlt_load_id", "__dlt_load_id")
-            .replace("_dlt_id", "__dlt_id")
-            .replace("_dlt_parent_id", "__dlt_parent_id")
-            .replace("_dlt_list_idx", "__dlt_list_idx")
-            .replace("_dlt_root_id", "__dlt_root_id")
-            .replace("_kafka_msg_id", "_kafka__msg_id")
-        )
-        return thing
-
-    @staticmethod
-    def unquirk(thing: str) -> str:
-        thing = (
-            thing.replace("__dlt_load_id", "_dlt_load_id")
-            .replace("__dlt_id", "_dlt_id")
-            .replace("__dlt_parent_id", "_dlt_parent_id")
-            .replace("__dlt_list_idx", "_dlt_list_idx")
-            .replace("__dlt_root_id", "_dlt_root_id")
-            .replace("_kafka__msg_id", "_kafka_msg_id")
-        )
-        return thing
-
-    @classmethod
-    def patch_sql(cls, sql: Union[str, psycopg2.sql.Composed]) -> Union[str, psycopg2.sql.Composed]:
-        if isinstance(sql, str):
-            sql = cls.quirk(sql)
-        elif isinstance(sql, psycopg2.sql.Composed):
-            sql.seq[0]._wrapped = cls.quirk(sql.seq[0]._wrapped)
-        else:
-            raise NotImplementedError(f"Unsupported type '{type(sql)}' for augmenting SQL: {sql}")
-        return sql
-
-    @classmethod
-    def patch_result(cls, result: Sequence[Sequence[Any]]) -> Optional[Sequence[Sequence[Any]]]:
-        if result is None:
-            return None
-        row_new = []
-        for row in result:
-            if len(row) >= 2 and row[1] in cls.quirked_labels:
-                r = list(row)
-                r[1] = cls.unquirk(r[1])
-                row = tuple(r)
-            row_new.append(row)
-        return row_new
