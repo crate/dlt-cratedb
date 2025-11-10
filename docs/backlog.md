@@ -57,7 +57,7 @@
   ```
   cr> select * from users;
   +----+-------+-------------------+----------------+
-  | id | name  |     __dlt_load_id | __dlt_id       |
+  | id | name  |     _dlt_load_id  | _dlt_id        |
   +----+-------+-------------------+----------------+
   |  2 | Bob   | 1749406972.57687  | NFPmX5Pw4gZ7fA |
   |  1 | Alice | 1749406985.809837 | 6/Xoe8jhlBUbAQ |
