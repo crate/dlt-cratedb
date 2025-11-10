@@ -93,7 +93,7 @@ optional-dependencies.release = [
   "twine>=6,<7",
 ]
 optional-dependencies.test = [
-  "duckdb",
+  "duckdb>=1.4.2.dev1",
   "pytest<9",
   "pytest-cov<8",
   "sqlfluff<3.6",
