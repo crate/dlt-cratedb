@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Removed `SystemColumnWorkaround` for `_`-prefixed column names.
+  The package now requires CrateDB 6.2 or higher.
 
 ## 2025/07/07 v0.0.2
 - ingestr: Fixed importing from Kafka per `SystemColumnWorkaround`
