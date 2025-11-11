@@ -154,3 +154,10 @@ class CrateDbSqlClient(Psycopg2SqlClient):
         A no-op is not enough, because downstream operations expect the schema to exist.
         """
         self.execute_sql(f"DROP TABLE IF EXISTS {self.fully_qualified_dataset_name()}._placeholder")
+
+    def _truncate_table_sql(self, qualified_table_name: str) -> str:
+        """
+        CrateDB does not understand `TRUNCATE TABLE ...`,
+        and `caps.supports_truncate_command = False` is no longer honored?
+        """
+        return f"DELETE FROM {qualified_table_name} WHERE 1=1"  # noqa: S608
