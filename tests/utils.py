@@ -23,9 +23,6 @@ from dlt.common.configuration.providers.provider import ConfigProvider
 from dlt.common.configuration.resolve import resolve_configuration
 from dlt.common.configuration.specs import PluggableRunContext, RuntimeConfiguration, configspec
 from dlt.common.configuration.specs.config_providers_context import ConfigProvidersContainer
-from dlt.common.configuration.specs.pluggable_run_context import (
-    SupportsRunContext,
-)
 from dlt.common.pipeline import LoadInfo, PipelineContext, SupportsPipeline
 from dlt.common.runtime import telemetry
 from dlt.common.runtime.run_context import DOT_DLT, RunContext
@@ -37,6 +34,14 @@ from dlt.common.storages.versioned_storage import VersionedStorage
 from dlt.common.typing import DictStrAny, StrAny, TDataItem
 from dlt.common.utils import custom_environ, set_working_dir, uniq_id
 from requests import Response
+from verlib2 import Version
+
+if Version(dlt.__version__) < Version("1.18"):
+    from dlt.common.configuration.specs.pluggable_run_context import (
+        SupportsRunContext as RunContextBase,
+    )
+else:
+    from dlt.common.configuration.specs.pluggable_run_context import RunContextBase
 
 TEST_STORAGE_ROOT = "_storage"
 
@@ -232,7 +237,7 @@ class MockableRunContext(RunContext):
     _data_dir: str
 
     @classmethod
-    def from_context(cls, ctx: SupportsRunContext) -> "MockableRunContext":
+    def from_context(cls, ctx: RunContextBase) -> "MockableRunContext":
         cls_ = cls(ctx.run_dir)
         cls_._name = ctx.name
         cls_._global_dir = ctx.global_dir

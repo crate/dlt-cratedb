@@ -27,11 +27,8 @@ jobs:
           '3.14',
         ]
         dlt-version: [
-          '1.10.*',
-          '1.11.*',
-          '1.12.*',
-          '1.13.*',
-          '1.14.*',
+          '<1.18',
+          '>=1.18',
         ]
 
     env:
@@ -60,8 +57,9 @@ jobs:
 
       - name: Set up project
         run: |
-          uv pip install 'dlt[postgres]==${{ matrix.dlt-version }}'
+          uv pip install 'dlt[postgres]${{ matrix.dlt-version }}'
           uv pip install --editable='.[develop,test]'
+          dlt --version
 
       - name: Set timezone
         uses: szenius/set-timezone@v2.0
@@ -83,4 +81,4 @@ jobs:
           flags: main
           env_vars: OS,PYTHON
           name: codecov-umbrella
-          fail_ci_if_error: false
+          fail_ci_if_error: true

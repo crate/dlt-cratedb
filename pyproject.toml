@@ -94,9 +94,11 @@ optional-dependencies.release = [
 ]
 optional-dependencies.test = [
   "duckdb>=1.4.2.dev1",
+  "hexbytes<2",
   "pytest<9",
   "pytest-cov<8",
   "sqlfluff<3.6",
+  "verlib2",
 ]
 
 urls.Changelog = "https://github.com/crate/dlt-cratedb/blob/main/CHANGES.md"
