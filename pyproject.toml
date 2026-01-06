@@ -95,7 +95,7 @@ optional-dependencies.release = [
 optional-dependencies.test = [
   "duckdb>=1.4.2.dev1",
   "hexbytes<2",
-  "pytest<9",
+  "pytest<10",
   "pytest-cov<8",
   "sqlfluff<3.6",
   "verlib2",
