@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+
+## 2026/03/04 v0.1.0
 - Fixed truncating tables by adding `CrateDbSqlClient._truncate_table_sql`
 - Removed `SystemColumnWorkaround` for `_`-prefixed column names.
   The package now requires CrateDB 6.2 or higher.
