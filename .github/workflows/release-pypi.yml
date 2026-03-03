@@ -46,26 +46,30 @@ jobs:
       - name: Acquire sources
         uses: actions/checkout@v6
 
-      - name: Set up uv
+      - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
-          cache-dependency-glob: |
-            pyproject.toml
+          activate-environment: true
           cache-suffix: ${{ matrix.python-version }}
           enable-cache: true
-          version: "latest"
+          python-version: ${{ matrix.python-version }}
 
       - name: Build package
         run: |
           uv build
+          uvx twine check dist/*
 
       - name: Publish package to TestPyPI
         if: false
         run: |
+
           # `uv publish` does not understand `--skip-existing`.
           # https://github.com/astral-sh/uv/issues/7917
           # https://github.com/astral-sh/uv/issues/12369
           uvx twine upload --non-interactive --verbose --repository-url https://test.pypi.org/legacy/ --skip-existing dist/*
+
+          # TODO: Next
+          # uv publish --publish-url https://test.pypi.org/legacy/
 
       - name: Publish package to PyPI
         if: startsWith(github.event.ref, 'refs/tags')
