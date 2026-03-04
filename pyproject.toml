@@ -237,6 +237,12 @@ method = "git-archive"
 default-tag = "v0.0.0"
 describe-subst = "$Format:%(describe:tags,match=v*)$"
 
+[tool.versioningit.format]
+# Emit PyPI-compatible "dirty" version strings. `+` characters are unsuitable, because
+# they would designate local version identifiers, which do not upload to PyPI.
+# https://packaging.python.org/en/latest/specifications/version-specifiers/#local-version-identifiers
+distance = "{base_version}.post{build_date:%Y%m%d%H%M%S}"
+
 # ===================
 # Tasks configuration
 # ===================
