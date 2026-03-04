@@ -60,16 +60,8 @@ jobs:
           uvx twine check dist/*
 
       - name: Publish package to TestPyPI
-        if: false
         run: |
-
-          # `uv publish` does not understand `--skip-existing`.
-          # https://github.com/astral-sh/uv/issues/7917
-          # https://github.com/astral-sh/uv/issues/12369
-          uvx twine upload --non-interactive --verbose --repository-url https://test.pypi.org/legacy/ --skip-existing dist/*
-
-          # TODO: Next
-          # uv publish --publish-url https://test.pypi.org/legacy/
+          uv publish --publish-url https://test.pypi.org/legacy/
 
       - name: Publish package to PyPI
         if: startsWith(github.event.ref, 'refs/tags')
