@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed CrateDB crashes by configuring `caps.max_query_length` to 4MB
+
 ## 2026/03/04 v0.1.0
 
 - Removed `SystemColumnWorkaround` for `_`-prefixed column names.
