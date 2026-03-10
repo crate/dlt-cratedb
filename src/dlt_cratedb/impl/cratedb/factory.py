@@ -83,6 +83,21 @@ class cratedb(postgres, Destination[CrateDbClientConfiguration, "CrateDbClient"]
         caps.supported_loader_file_formats = ["insert_values"]
         caps.loader_file_format_selector = None
 
+        # PostgreSQL uses 32 MB SQL buffer.
+        # Problem: That makes CrateDB crash and dump its heap, also with 16 MB.
+        #          java.lang.OutOfMemoryError: Java heap space
+
+        # Data source: 5x this resource == 500.000 records.
+        # https://cdn.crate.io/downloads/datasets/cratedb-datasets/cloud-tutorials/devices_readings.json.gz
+        # Advise: Avoid gc thrashing.
+        # [gc][93] overhead, spent [682ms] collecting in the last [1.2s]
+
+        #  2 MB => 1m26s (no gc thrashing)
+        #  4 MB => 1m18s (no gc thrashing)
+        #  6 MB => 1m19s (gc thrashing)
+        caps.max_query_length = 4 * 1024 * 1024
+        caps.is_max_query_length_in_bytes = True
+
         return caps
 
     @property
