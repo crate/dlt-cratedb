@@ -97,7 +97,7 @@ optional-dependencies.test = [
   "hexbytes<2",
   "pytest<10",
   "pytest-cov<8",
-  "sqlfluff<4.1",
+  "sqlfluff<4.2",
   "verlib2",
 ]
 
