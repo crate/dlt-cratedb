@@ -8,6 +8,28 @@ from dlt.common.data_writers.escape import _escape_extended, _make_sql_escape_re
 SQL_ESCAPE_DICT = {"'": "''"}
 SQL_ESCAPE_RE = _make_sql_escape_re(SQL_ESCAPE_DICT)
 
+# CrateDB reserves a fixed set of system column names. Defining a top-level column with
+# one of these names fails with `InvalidColumnNameException[... conflicts with system column]`.
+# This is an *exact* match, not a pattern: since CrateDB 6.2 (crate/crate#15161) the generic
+# `_`-prefix restriction was lifted, so only these specific names remain reserved. Object
+# sub-keys are unaffected. Source of truth: crate/crate `SysColumns.NAMES`.
+# https://github.com/crate/crate/issues/15161
+RESERVED_SYSTEM_COLUMNS = frozenset(
+    {
+        "_id",
+        "_version",
+        "_score",
+        "_uid",
+        "_doc",
+        "_raw",
+        "_seq_no",
+        "_primary_term",
+        "_tombstone",
+        "_fetchid",
+        "_docid",
+    }
+)
+
 
 def _escape_extended_cratedb(v: str) -> str:
     """

@@ -77,6 +77,12 @@ class cratedb(postgres, Destination[CrateDbClientConfiguration, "CrateDbClient"]
         # TODO: Escaping might need further adjustments, to be explored using integration tests.
         caps.escape_literal = escape_cratedb_literal
 
+        # CrateDB reserves a fixed set of `_`-prefixed system column names (e.g. `_id`,
+        # which MongoDB stamps on every document). Use a naming convention that renames
+        # those to a double-underscore variant to avoid `conflicts with system column`.
+        # https://github.com/crate/dlt-cratedb/issues/19
+        caps.naming_convention = "dlt_cratedb.impl.cratedb.naming"
+
         # CrateDB does not support direct data loading using advanced formats.
         # TODO: Explore adding more formats for staged imports.
         caps.preferred_loader_file_format = "insert_values"

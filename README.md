@@ -34,6 +34,8 @@ Please refer to the [overview] and the [usage guide].
 - The `cratedb` adapter is heavily based on the `postgres` adapter.
 - The `CrateDbSqlClient` deviates from the original `Psycopg2SqlClient` by
   adding a few CrateDB-specific adjustments.
+- A CrateDB-specific naming convention renames columns that collide with
+  CrateDB's reserved system column names, such as MongoDB's `_id`.
 
 ## Backlog
 
