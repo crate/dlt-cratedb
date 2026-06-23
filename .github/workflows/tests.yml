@@ -37,6 +37,15 @@ jobs:
       OS: ${{ matrix.os }}
       PYTHON: ${{ matrix.python-version }}
 
+    services:
+      cratedb:
+        image: crate/crate:nightly
+        ports:
+          - 4200:4200
+          - 5432:5432
+        env:
+          CRATE_HEAP_SIZE: 2g
+
     steps:
 
       - name: Acquire sources
