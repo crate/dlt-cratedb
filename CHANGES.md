@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fixed importing from MongoDB: columns that collide with CrateDB's reserved
+  system column names (most notably MongoDB's `_id`) are now renamed with a
+  leading underscore (e.g. `_id` -> `__id`) via a dedicated naming convention,
+  instead of failing with `"_id" conflicts with system column`.
+
 ## 2026/03/10 v0.1.1
 
 - Fixed CrateDB crashes by configuring `caps.max_query_length` to 4MB

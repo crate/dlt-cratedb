@@ -183,6 +183,38 @@ def test_create_table_case_sensitive(cs_client: CrateDbClient) -> None:
         assert line.startswith('"Col')
 
 
+@pytest.fixture
+def reserved_client(empty_schema: Schema, credentials: CrateDbCredentials) -> CrateDbClient:
+    # Switch to the CrateDB naming convention, which escapes reserved system column names.
+    empty_schema._normalizers_config["names"] = "dlt_cratedb.impl.cratedb.naming"
+    empty_schema.update_normalizers()
+    return create_client(empty_schema, credentials=credentials)
+
+
+def test_create_table_escapes_reserved_columns(reserved_client: CrateDbClient) -> None:
+    # MongoDB stamps every document with `_id`, which collides with one of CrateDB's
+    # reserved system columns. The CrateDB naming convention renames it to `__id` so
+    # the `CREATE TABLE` no longer raises `"_id" conflicts with system column`.
+    # https://github.com/crate/dlt-cratedb/issues/19
+    table_name = "people"
+    reserved_client.schema.update_table(
+        utils.new_table(
+            table_name,
+            columns=[
+                {"name": "_id", "data_type": "text", "nullable": False},
+                {"name": "name", "data_type": "text", "nullable": True},
+                {"name": "_dlt_id", "data_type": "text", "nullable": False},
+            ],
+        )
+    )
+    columns = list(reserved_client.schema.get_table_columns(table_name).values())
+    sql = reserved_client._get_table_update_sql(table_name, columns, False)[0]
+    assert '"__id"' in sql  # `_id` is renamed ...
+    assert '"_id"' not in sql  # ... so the bare reserved name never reaches the DDL
+    assert '"name"' in sql  # non-reserved column, untouched
+    assert '"_dlt_id"' in sql  # dlt's own column is not reserved, untouched
+
+
 def test_create_dlt_table(client: CrateDbClient) -> None:
     # non existing table
     sql = client._get_table_update_sql("_dlt_version", TABLE_UPDATE, False)[0]
