@@ -38,6 +38,22 @@ class CrateDbTypeMapper(PostgresTypeMapper):
 
         return super().__new__(cls)
 
+    def to_destination_type(
+        self,
+        column: TColumnSchema,
+        table: PreparedTableSchema = None,
+    ) -> str:
+        """
+        Render against a *copy* of the column.
+
+        `to_db_datetime_type` nullifies `precision` in place, but `column` is a live
+        reference into the dlt `Schema`. Mutating it there changes the schema hash mid-load,
+        which trips `DestinationSchemaTampered` on the staging pass of `merge`/`delete-insert`.
+
+        https://github.com/crate/dlt-cratedb/issues/14
+        """
+        return super().to_destination_type(dict(column), table)  # type: ignore[arg-type]
+
     def to_db_datetime_type(
         self,
         column: TColumnSchema,
