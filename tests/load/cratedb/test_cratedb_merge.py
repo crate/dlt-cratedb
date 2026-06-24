@@ -40,6 +40,14 @@ def _row_count(pipeline: dlt.Pipeline, table_name: str) -> int:
             return int(cur.fetchone()[0])
 
 
+def _names(pipeline: dlt.Pipeline, table_name: str) -> set:
+    with pipeline.sql_client() as client:
+        qualified = client.make_qualified_table_name(table_name)
+        client.execute_sql(f"REFRESH TABLE {qualified}")
+        with client.execute_query(f"SELECT name FROM {qualified}") as cur:
+            return {row[0] for row in cur.fetchall()}
+
+
 def test_merge_does_not_tamper_schema(credentials: CrateDbCredentials) -> None:
     """Two consecutive `merge` loads must not raise `DestinationSchemaTampered`."""
     dataset_name = _dataset_name()
@@ -61,9 +69,9 @@ def test_merge_does_not_tamper_schema(credentials: CrateDbCredentials) -> None:
     info2 = pipeline.run(second, table_name="people", write_disposition="merge", primary_key="id")
     assert not info2.has_failed_jobs
 
-    # `merge` is redirected to a full replace on CrateDB (GH-6), so only the 2nd load
-    # survives. We check it doesn't crash and data lands, not merge semantics.
-    assert _row_count(pipeline, "people") == len(second)
+    # `merge` is redirected to a full replace on CrateDB (GH-6): the 2nd load replaces the
+    # 1st, so only `second`'s rows remain.
+    assert _names(pipeline, "people") == {"Bob v2", "Carol"}
 
 
 def test_delete_insert_without_primary_key(credentials: CrateDbCredentials) -> None:

@@ -44,27 +44,15 @@ class CrateDbTypeMapper(PostgresTypeMapper):
         table: PreparedTableSchema = None,
     ) -> str:
         """
-        Render against a *copy* of the column.
-
-        `to_db_datetime_type` nullifies `precision` in place, but `column` is a live
-        reference into the dlt `Schema`. Mutating it there changes the schema hash mid-load,
-        which trips `DestinationSchemaTampered` on the staging pass of `merge`/`delete-insert`.
-
+        - CrateDB has no `timestamp(precision)` type, so drop `precision` before rendering.
+        - Render against a copy: `column` is a live reference into the dlt `Schema`, and
+        mutating it changes the schema hash mid-load, tripping `DestinationSchemaTampered`
+        on the staging pass of `merge` / `delete-insert`.
         https://github.com/crate/dlt-cratedb/issues/14
         """
-        return super().to_destination_type(dict(column), table)  # type: ignore[arg-type]
-
-    def to_db_datetime_type(
-        self,
-        column: TColumnSchema,
-        table: PreparedTableSchema = None,
-    ) -> str:
-        """
-        CrateDB does not support `timestamp(6) without time zone`.
-        To not render the SQL clause like this, nullify the `precision` attribute.
-        """
-        column["precision"] = None
-        return super().to_db_datetime_type(column, table)
+        if column.get("data_type") == "timestamp":
+            column = {**column, "precision": None}
+        return super().to_destination_type(column, table)  # type: ignore[arg-type]
 
 
 class cratedb(postgres, Destination[CrateDbClientConfiguration, "CrateDbClient"]):
