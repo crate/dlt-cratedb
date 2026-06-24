@@ -39,7 +39,7 @@ jobs:
 
     services:
       cratedb:
-        image: crate/crate:latest
+        image: crate/crate:nightly
         ports:
           - 4200:4200
           - 5432:5432
