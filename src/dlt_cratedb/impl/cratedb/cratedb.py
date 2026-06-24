@@ -9,6 +9,7 @@ from dlt.common.destination.client import (
     PreparedTableSchema,
 )
 from dlt.common.schema import Schema, TColumnHint
+from dlt.destinations.exceptions import DatabaseUndefinedRelation
 from dlt.destinations.impl.postgres.postgres import PostgresClient
 from dlt.destinations.insert_job_client import InsertValuesJobClient
 from dlt.destinations.sql_client import SqlClientBase
@@ -132,9 +133,18 @@ class CrateDbClient(PostgresClient):
 
     def _delete_schema_in_storage(self, schema: Schema) -> None:
         """
-        Intercept to invoke a `REFRESH TABLE ...` statement.
+        Intercept to invoke a `REFRESH TABLE ...` statement, and tolerate a missing
+        version table. (#14)
         """
-        result = super()._delete_schema_in_storage(schema=schema)
+        try:
+            result = super()._delete_schema_in_storage(schema=schema)
+        except DatabaseUndefinedRelation:
+            logger.debug(
+                "Version table %s absent while deleting schema %s; nothing to delete.",
+                self.schema.version_table_name,
+                schema.name,
+            )
+            return None
         table_name = self.sql_client.make_qualified_table_name(self.schema.version_table_name)
         self.sql_client.execute_sql(f"REFRESH TABLE {table_name}")
         return result
