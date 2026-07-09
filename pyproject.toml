@@ -241,7 +241,9 @@ describe-subst = "$Format:%(describe:tags,match=v*)$"
 # Emit PyPI-compatible "dirty" version strings. `+` characters are unsuitable, because
 # they would designate local version identifiers, which do not upload to PyPI.
 # https://packaging.python.org/en/latest/specifications/version-specifiers/#local-version-identifiers
-distance = "{base_version}.post{build_date:%Y%m%d%H%M%S}"
+# distance = "{base_version}.post{build_date:%Y%m%d%H%M%S}"
+# Package metadata version `0.1.1.post20260709230853` does not match `0.1.1.post20260709230854` from the wheel filename
+distance = "{base_version}.post{build_date:%Y%m%d%H%M}"
 
 # ===================
 # Tasks configuration
