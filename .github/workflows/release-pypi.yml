@@ -64,6 +64,7 @@ jobs:
           uvx twine check dist/*
 
       - name: Publish package to TestPyPI
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
         run: |
           uv publish --publish-url https://test.pypi.org/legacy/
 
