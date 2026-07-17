@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fixed `merge`, `delete-insert`, and `refresh="drop_resources"` crashing on CrateDB
+  (GH-14): the datetime type mapper no longer mutates the live schema (which tripped
+  `DestinationSchemaTampered`), and deleting a schema now tolerates an already-dropped
+  `_dlt_version` table instead of aborting the load.
 - Fixed importing from MongoDB: columns that collide with CrateDB's reserved
   system column names (most notably MongoDB's `_id`) are now renamed with a
   leading underscore (e.g. `_id` -> `__id`) via a dedicated naming convention,

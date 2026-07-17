@@ -37,10 +37,19 @@ jobs:
       OS: ${{ matrix.os }}
       PYTHON: ${{ matrix.python-version }}
 
+    services:
+      cratedb:
+        image: crate/crate:nightly
+        ports:
+          - 4200:4200
+          - 5432:5432
+        env:
+          CRATE_HEAP_SIZE: 2g
+
     steps:
 
       - name: Acquire sources
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -64,12 +73,21 @@ jobs:
           timezoneMacos: "Europe/Berlin"
           timezoneWindows: "European Standard Time"
 
+      - name: Wait for CrateDB
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -sf http://localhost:4200/ >/dev/null; then echo "CrateDB ready"; exit 0; fi
+            sleep 2
+          done
+          echo "CrateDB not ready in time" >&2
+          exit 1
+
       - name: Run linters and software tests
         run: poe check
 
       # https://github.com/codecov/codecov-action
       - name: Upload coverage results to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
