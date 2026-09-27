@@ -149,13 +149,23 @@ def test_merge_primary_key(pipeline: dlt.Pipeline) -> None:
 
 
 def test_merge_is_visible_without_refresh(pipeline: dlt.Pipeline) -> None:
-    """The merged rows are queryable as soon as the load returns."""
+    """The merged rows are queryable as soon as the load returns.
+
+    CrateDB also refreshes on its own every second, so the query alone can pass without
+    the job's refresh. Check that the job ends by refreshing the destination, too.
+    """
     kwargs = {"table_name": "t", "write_disposition": "merge", "primary_key": "id"}
     _run(pipeline, [{"id": 1}, {"id": 2}], **kwargs)
     _run(pipeline, [{"id": 2}, {"id": 3}], **kwargs)
 
     table = f'"{pipeline.dataset_name}"."t"'
     assert _query(pipeline, f"SELECT count(*) FROM {table}") == [(3,)]
+
+    with pipeline.destination_client() as client:
+        table_chain = [client.prepare_load_table("t")]
+        sql = CrateDbMergeJob.generate_sql(table_chain, client.sql_client)
+        destination = client.sql_client.make_qualified_table_name("t")
+    assert sql[-1] == f"REFRESH TABLE {destination};"
 
 
 def test_merge_deduplicates_without_dedup_sort(pipeline: dlt.Pipeline) -> None:
@@ -178,20 +188,38 @@ def test_merge_compound_primary_key(pipeline: dlt.Pipeline) -> None:
 
 
 def test_merge_compound_key_values_cannot_collide(pipeline: dlt.Pipeline) -> None:
-    """A key part containing a would-be separator must not match an unrelated row."""
+    """Compound keys that read the same once joined must not match each other.
+
+    `("ab", "c")` and `("a", "bc")` collide under plain concatenation, and
+    `("a\x1fb", "c")` and `("a", "b\x1fc")` under a `chr(31)` separator.
+    """
     kwargs = {"table_name": "t", "write_disposition": "merge", "primary_key": ["a", "b"]}
     _run(
         pipeline,
-        [{"a": "a\x1fb", "b": "c", "v": "kept"}, {"a": "p", "b": "q", "v": "old"}],
+        [
+            {"a": "ab", "b": "c", "v": "kept"},
+            {"a": "a\x1fb", "b": "c", "v": "kept"},
+            {"a": "p", "b": "q", "v": "old"},
+        ],
         **kwargs,
     )
     _run(
         pipeline,
-        [{"a": "a", "b": "b\x1fc", "v": "new"}, {"a": "p", "b": "q", "v": "new"}],
+        [
+            {"a": "a", "b": "bc", "v": "new"},
+            {"a": "a", "b": "b\x1fc", "v": "new"},
+            {"a": "p", "b": "q", "v": "new"},
+        ],
         **kwargs,
     )
 
-    assert _rows(pipeline, "t", "v") == [("kept",), ("new",), ("new",)]
+    assert _rows(pipeline, "t", "v") == [
+        ("kept",),
+        ("kept",),
+        ("new",),
+        ("new",),
+        ("new",),
+    ]
 
 
 def test_merge_merge_key(pipeline: dlt.Pipeline) -> None:
@@ -377,17 +405,40 @@ def test_scd2(pipeline: dlt.Pipeline) -> None:
     ]
 
 
+def test_scd2_reinserts_retired_version(pipeline: dlt.Pipeline) -> None:
+    """A version that comes back after being retired becomes active again."""
+    for name in ("a", "b", "a"):
+        _run(pipeline, [{"id": 1, "name": name}], table_name="t", write_disposition=SCD2)
+
+    assert _rows(pipeline, "t", "name, _dlt_valid_to IS NULL") == [
+        ("a", False),
+        ("a", True),
+        ("b", False),
+    ]
+
+
 def test_scd2_compound_merge_key(pipeline: dlt.Pipeline) -> None:
     def resource(data: List[Dict[str, Any]]) -> Any:
         return dlt.resource(data, name="t", write_disposition=SCD2, merge_key=["k1", "k2"])
 
-    _run(pipeline, resource([{"k1": 1, "k2": "x", "v": 1}, {"k1": 2, "k2": "y", "v": 1}]))
+    _run(
+        pipeline,
+        resource(
+            [
+                {"k1": 1, "k2": "x", "v": 1},
+                {"k1": 1, "k2": "y", "v": 1},
+                {"k1": 2, "k2": "y", "v": 1},
+            ]
+        ),
+    )
+    # Only `(1, "x")` is in the batch, so `(1, "y")` stays active although `k1` matches.
     _run(pipeline, resource([{"k1": 1, "k2": "x", "v": 2}]))
 
-    assert _rows(pipeline, "t", "k1, v, _dlt_valid_to IS NULL") == [
-        (1, 1, False),
-        (1, 2, True),
-        (2, 1, True),
+    assert _rows(pipeline, "t", "k1, k2, v, _dlt_valid_to IS NULL") == [
+        (1, "x", 1, False),
+        (1, "x", 2, True),
+        (1, "y", 1, True),
+        (2, "y", 1, True),
     ]
 
 
