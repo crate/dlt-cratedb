@@ -9,11 +9,6 @@
 
 - Documentation: How JSONB/ARRAYs are mapped to CrateDB
 
-- CrateDB does not support the `merge` followup job yet. The adapter
-  runs a staging `replace` job instead, so a `merge` load drops all rows
-  that are not part of the batch: loading `{1, 2}` and then `{2, 3}`
-  leaves `{2, 3}`. See [GH-6](https://github.com/crate/dlt-cratedb/issues/6).
-
 - Is it possible to use an `adapter` to better support CrateDB's special
   data types? For example, full round-tripping using `sys.summits` isn't
   possible just yet, due to the `coordinates` column, for example when
