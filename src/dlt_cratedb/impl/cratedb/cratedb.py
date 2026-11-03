@@ -174,6 +174,9 @@ class CrateDbMergeJob(SqlMergeFollowupJob):
 
         dlt >= 1.32 selects destination rows by a compound merge key with this condition.
         The destination table has no alias, so its qualified name prefixes its columns.
+
+        `IN` is NULL where `EXISTS` is false, when a key part is NULL, and dlt negates the
+        condition to select absent rows. `COALESCE` keeps the negation true there.
         """
         qualifier = cls.gen_column_qualifier(table_name, sql_client)
         present = (
@@ -181,7 +184,7 @@ class CrateDbMergeJob(SqlMergeFollowupJob):
         )
         if source_filter:
             present += f" WHERE {source_filter}"
-        return f"{cls._gen_key_expr(key_columns, qualifier)} IN ({present})"
+        return f"COALESCE({cls._gen_key_expr(key_columns, qualifier)} IN ({present}), FALSE)"
 
     @classmethod
     def gen_concat_sql(cls, columns: Sequence[str]) -> str:

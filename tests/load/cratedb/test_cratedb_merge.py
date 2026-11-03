@@ -21,6 +21,7 @@ from dlt.common.configuration.container import Container
 from dlt.common.destination.exceptions import DestinationCapabilitiesException
 from dlt.common.schema.typing import MERGE_STRATEGIES
 from dlt.common.storages.load_package import LoadPackageStateInjectableContext
+from dlt.destinations.sql_jobs import SqlMergeFollowupJob
 from dlt.pipeline.exceptions import PipelineStepFailed
 from verlib2 import Version
 
@@ -496,6 +497,32 @@ def test_scd2_rerun_converges(pipeline: dlt.Pipeline) -> None:
         (2, "b", False),
         (2, "b2", True),
     ]
+
+
+def test_compound_key_staging_cond_matches_exists(pipeline: dlt.Pipeline) -> None:
+    """The compound-key condition selects the rows dlt's correlated `EXISTS` selects, and so
+    does its negation, which dlt uses to find absent rows, when key parts are NULL."""
+    if not hasattr(SqlMergeFollowupJob, "_gen_keys_exist_in_staging_cond"):
+        pytest.skip(f"dlt {dlt.__version__} never selects rows by this condition")
+    _run(
+        pipeline,
+        [{"k1": 1, "k2": "a"}, {"k1": 1, "k2": None}, {"k1": 3, "k2": "c"}],
+        table_name="d",
+    )
+    _run(pipeline, [{"k1": 1, "k2": "a"}, {"k1": 3, "k2": None}], table_name="s")
+    _rows(pipeline, "s", "k1")
+    with pipeline.sql_client() as client:
+        cond = CrateDbMergeJob._gen_keys_exist_in_staging_cond(
+            "d", client.make_qualified_table_name("s"), ["k1", "k2"], client
+        )
+        qualified = client.make_qualified_table_name("d")
+
+    def select(where: str) -> set:
+        _rows(pipeline, "d", "k1")
+        return set(_query(pipeline, f"SELECT k1, k2 FROM {qualified} WHERE {where}"))
+
+    assert select(cond) == {(1, "a")}
+    assert select(f"NOT {cond}") == {(1, None), (3, "c")}
 
 
 @pytest.mark.parametrize("strategy", ["upsert", "insert-only"])
