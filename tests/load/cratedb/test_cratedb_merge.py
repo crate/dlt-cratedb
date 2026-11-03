@@ -17,8 +17,10 @@ from typing import Any, Dict, Iterator, List, Sequence, Tuple
 import dlt
 import psycopg2
 import pytest
+from dlt.common.configuration.container import Container
 from dlt.common.destination.exceptions import DestinationCapabilitiesException
 from dlt.common.schema.typing import MERGE_STRATEGIES
+from dlt.common.storages.load_package import LoadPackageStateInjectableContext
 from dlt.pipeline.exceptions import PipelineStepFailed
 from verlib2 import Version
 
@@ -99,8 +101,15 @@ def _rerun_merge_sql(pipeline: dlt.Pipeline, table_names: Sequence[str]) -> None
 
     Split the statements the way dlt does for a job file (one statement per line, then on
     `;`), because CrateDB 6.2 rejects empty statements.
+
+    Generate inside the last load package's state, as the loader does: dlt >= 1.32 reads
+    the `scd2` boundary timestamp from there.
     """
-    with pipeline.destination_client() as client:
+    load_id = max(pipeline.list_completed_load_packages(), key=float)
+    package_state = LoadPackageStateInjectableContext(
+        storage=pipeline._get_load_storage().loaded_packages, load_id=load_id
+    )
+    with Container().injectable_context(package_state), pipeline.destination_client() as client:
         table_chain = [client.prepare_load_table(name) for name in table_names]
         lines = [
             " ".join(statement.splitlines())

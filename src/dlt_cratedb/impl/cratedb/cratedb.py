@@ -161,6 +161,29 @@ class CrateDbMergeJob(SqlMergeFollowupJob):
         return [f"FROM {root_table_name} AS d WHERE {condition}"]
 
     @classmethod
+    def _gen_keys_exist_in_staging_cond(
+        cls,
+        table_name: str,
+        staging_root_table_name: str,
+        key_columns: Sequence[str],
+        sql_client: SqlClientBase[Any],
+        source_filter: Optional[str] = None,
+    ) -> str:
+        """
+        One non-correlated `IN` on the encoded key, instead of dlt's correlated `EXISTS`.
+
+        dlt >= 1.32 selects destination rows by a compound merge key with this condition.
+        The destination table has no alias, so its qualified name prefixes its columns.
+        """
+        qualifier = cls.gen_column_qualifier(table_name, sql_client)
+        present = (
+            f"SELECT {cls._gen_key_expr(key_columns, 's')} FROM {staging_root_table_name} AS s"
+        )
+        if source_filter:
+            present += f" WHERE {source_filter}"
+        return f"{cls._gen_key_expr(key_columns, qualifier)} IN ({present})"
+
+    @classmethod
     def gen_concat_sql(cls, columns: Sequence[str]) -> str:
         """
         Encode a compound key as one string, each part prefixed by its length.
