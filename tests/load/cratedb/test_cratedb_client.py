@@ -2,13 +2,17 @@ import os
 from typing import Iterator
 
 import pytest
+from dlt.common.configuration.exceptions import ConfigurationValueError
 from dlt.common.configuration.resolve import (
     ConfigFieldMissingException,
     resolve_configuration,
 )
 from dlt.common.storages import FileStorage
 
-from dlt_cratedb.impl.cratedb.configuration import CrateDbCredentials
+from dlt_cratedb.impl.cratedb.configuration import (
+    CrateDbClientConfiguration,
+    CrateDbCredentials,
+)
 from dlt_cratedb.impl.cratedb.cratedb import CrateDbClient
 from tests.load.utils import yield_client_with_storage
 from tests.utils import TEST_STORAGE_ROOT, delete_test_storage
@@ -65,6 +69,22 @@ def test_cratedb_credentials_native_value(environment) -> None:
     c = CrateDbCredentials("cratedb://loader:loader@localhost/dlt_data")
     assert c.password == "loader"
     assert c.database is None
+
+
+def test_cratedb_data_location() -> None:
+    # The database path is dropped, and the port defaults to 5432.
+    config = CrateDbClientConfiguration(
+        credentials=CrateDbCredentials("cratedb://loader:loader@localhost/dlt_data")
+    )
+    assert config.data_location() == "localhost:5432"
+
+    config = CrateDbClientConfiguration(
+        credentials=CrateDbCredentials("cratedb://loader:loader@cratedb.example.org:15432")
+    )
+    assert config.data_location() == "cratedb.example.org:15432"
+
+    with pytest.raises(ConfigurationValueError, match="has no host"):
+        CrateDbClientConfiguration(credentials=CrateDbCredentials()).data_location()
 
 
 def test_cratedb_query_params() -> None:
