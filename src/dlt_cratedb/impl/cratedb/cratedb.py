@@ -119,13 +119,13 @@ class CrateDbClient(PostgresClient):
 
         dlt restores pipeline state by joining `_dlt_pipeline_state` to `_dlt_loads`, so
         both have to show this load's rows before the next run reads them back. The state
-        table is refreshed in its own statement, so a missing state table cannot get in the
-        way of refreshing `_dlt_loads`.
+        row is written before the load is marked complete, so its table is refreshed first:
+        a reader that sees this load in `_dlt_loads` also sees its state.
         """
+        self._refresh_state_table()
         result = super().complete_load(load_id=load_id)
         table_name = self.sql_client.make_qualified_table_name(self.schema.loads_table_name)
         self.sql_client.execute_sql(f"REFRESH TABLE {table_name}")
-        self._refresh_state_table()
         return result
 
     def _refresh_state_table(self) -> None:
