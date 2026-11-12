@@ -89,8 +89,7 @@ def test_round_trip_strings_and_objects(credentials: CrateDbCredentials) -> None
     assert not info.has_failed_jobs
 
     assert _texts(pipeline, "tricky") == dict(enumerate(TRICKY_STRINGS))
-    # Read the array element as a scalar: CrateDB's PostgreSQL wire protocol does not escape
-    # backslashes and double quotes when it sends a whole text array.
+    # Read the array element as a scalar.
     with pipeline.sql_client() as client:
         qualified = client.make_qualified_table_name("tricky")
         with client.execute_query(
