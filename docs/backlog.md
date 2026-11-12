@@ -2,17 +2,6 @@
 
 ## Iteration +1
 
-- Check if the Redshift literal escaper is the right choice for all
-  data types it is handling. The adapter's `escape_cratedb_literal`
-  leaves newlines inside strings unescaped, while dlt's `insert_values`
-  loader assumes one row per line: it reads `max_query_length // 2`
-  characters and completes the statement up to the next newline. When a
-  load file is larger than that, the cut can land inside a multi-line
-  string, and the load fails with
-  `SyntaxError: ... no viable alternative at input 'VALUES ...`.
-  The `players_games` resource of the `chess` source runs into this.
-  CrateDB accepts `E'...'` escape strings, e.g. `SELECT E'a\nb'`.
-
 - `dlt init chess cratedb` fails, because the dlt CLI does not import
   `dlt_cratedb`, so it cannot resolve the `cratedb` destination.
 
