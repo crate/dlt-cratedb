@@ -3,30 +3,27 @@
 ## Iteration +1
 
 - Check if the Redshift literal escaper is the right choice for all
-  data types it is handling.
+  data types it is handling. The adapter's `escape_cratedb_literal`
+  leaves newlines inside strings unescaped, while dlt's `insert_values`
+  loader assumes one row per line: it reads `max_query_length // 2`
+  characters and completes the statement up to the next newline. When a
+  load file is larger than that, the cut can land inside a multi-line
+  string, and the load fails with
+  `SyntaxError: ... no viable alternative at input 'VALUES ...`.
+  The `players_games` resource of the `chess` source runs into this.
+  CrateDB accepts `E'...'` escape strings, e.g. `SELECT E'a\nb'`.
 
-- Currently only works with CrateDB's default dataset / schema `doc`,
-  that's why out-of-the-box `dlt init chess cratedb` will fail like
-  `ERROR: Schema 'chess_players_games_data' unknown`. Why!?
-  Thoughts: Most probably, dlt introspects the available schemas,
-  doesn't find it in CrateDB, and fails. It doesn't know that CrateDB
-  would create the schema transparently, without needing an explicit
-  `CREATE SCHEMA ...` operation.
+- `dlt init chess cratedb` fails, because the dlt CLI does not import
+  `dlt_cratedb`, so it cannot resolve the `cratedb` destination.
 
 - ERROR: mismatched input 'ABORT' expecting {....
 
 - Documentation: How JSONB/ARRAYs are mapped to CrateDB
 
-- The `merge` followup job is currently defunct with CrateDB.
-  It has been replaced by  a `replace" [sic!] job.
-
-- Troubleshooting: Workloads specifying certain write dispositions currently
-  need to be invoked twice. On the first invocation, this happens:
-
-      dlt.pipeline.exceptions.PipelineStepFailed: Pipeline execution failed at stage load when processing package 1750628689.026369 with exception:
-
-      <class 'dlt.common.destination.exceptions.DestinationSchemaTampered'>
-      Schema frankfurter content was changed - by a loader or by destination code - from the moment it was retrieved by load package. Such schema cannot reliably be updated nor saved. Current version hash: ZUJEaD/gSBvY9vbgx3urdi93mJppp7CMlRaLuJkxJCs= != stored version hash Cocqcq+4Qzo8zLOc9R3uYjhjLZr6D/QwgS03TtFG2wI=. If you are using destination client directly, without storing schema in load package, you should first save it into schema storage. You can also use schema._bump_version() in test code to remove modified flag.
+- CrateDB does not support the `merge` followup job yet. The adapter
+  runs a staging `replace` job instead, so a `merge` load drops all rows
+  that are not part of the batch: loading `{1, 2}` and then `{2, 3}`
+  leaves `{2, 3}`. See [GH-6](https://github.com/crate/dlt-cratedb/issues/6).
 
 - Is it possible to use an `adapter` to better support CrateDB's special
   data types? For example, full round-tripping using `sys.summits` isn't
@@ -36,8 +33,14 @@
 - Is it possible to provide other direct loaders from the `sqlalchemy`
   adapter?
 
-- Addressing per `cratedb://` will raise errors, e.g. in `ingestr`:
-  `Following fields are missing: ['password', 'username', 'host'] in configuration with spec CrateDbCredentials`
+- Addressing per `cratedb://` will raise errors. dlt passes the URL
+  scheme through to psycopg2, which rejects it:
+  `invalid dsn: invalid connection option "cratedb://crate:@localhost:5432?connect_timeout"`.
+  Without a password, e.g. `cratedb://crate@localhost:5432/`, resolving
+  the configuration fails even earlier:
+  `Missing 1 field(s) in configuration CrateDbClientConfiguration: credentials`.
+  The same happens with `postgres://crate@localhost:5432/`, so CrateDB's
+  password-less default user must be spelled `crate:@`.
 
 - Add staging support
   > CrateDB supports Amazon S3, Google Cloud Storage, and Azure Blob
@@ -47,8 +50,6 @@
 
 - > Data is loaded into CrateDB using the most efficient method
   > depending on the data source.
-
-- > CrateDB does not support the `binary` datatype. Binary will be loaded to a `text` column.
 
 ## Iteration +2
 
