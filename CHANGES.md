@@ -13,6 +13,10 @@
   system column names (most notably MongoDB's `_id`) are now renamed with a
   leading underscore (e.g. `_id` -> `__id`) via a dedicated naming convention,
   instead of failing with `"_id" conflicts with system column`.
+- Fixed loading strings that contain newlines or carriage returns: string literals are
+  now rendered on one line as escape strings (`E'...'`). dlt splits load files into
+  statements line by line, so a larger load could fail with `SyntaxError: ... no viable
+  alternative at input 'VALUES ...`, and carriage returns were stored as newlines.
 
 ## 2026/03/10 v0.1.1
 

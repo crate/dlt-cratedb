@@ -4,8 +4,16 @@ from typing import Any
 
 from dlt.common.data_writers.escape import _escape_extended, _make_sql_escape_re
 
-# CrateDB does not accept the original `{"'": "''", "\\": "\\\\", "\n": "\\n", "\r": "\\r"}`?
-SQL_ESCAPE_DICT = {"'": "''"}
+# Strings are rendered as escape string literals (`E'...'`), so that newlines and carriage
+# returns can be escaped: dlt's `insert_values` loader splits load files into statements
+# line by line, which needs every row on a single line.
+#
+# The escapes deviate from PostgreSQL's, because CrateDB's escape string parser
+# - decodes a doubled quote `''` wrongly or rejects it (`E'a''b'` fails, `E'''x'` yields `''x`),
+#   so a quote is escaped as `\'`.
+# - fails on a backslash right before the closing quote (`E'x\\'`), so a backslash is escaped
+#   as `\x5c`, and the literal never ends in a backslash.
+SQL_ESCAPE_DICT = {"'": "\\'", "\\": "\\x5c", "\n": "\\n", "\r": "\\r"}
 SQL_ESCAPE_RE = _make_sql_escape_re(SQL_ESCAPE_DICT)
 
 # CrateDB reserves a fixed set of system column names. Defining a top-level column with
@@ -33,9 +41,9 @@ RESERVED_SYSTEM_COLUMNS = frozenset(
 
 def _escape_extended_cratedb(v: str) -> str:
     """
-    The best-practice escaper for CrateDB, discovered by trial-and-error.
+    Render a string as a single-line CrateDB escape string literal, see `SQL_ESCAPE_DICT`.
     """
-    return _escape_extended(v, prefix="'", escape_dict=SQL_ESCAPE_DICT, escape_re=SQL_ESCAPE_RE)
+    return _escape_extended(v, prefix="E'", escape_dict=SQL_ESCAPE_DICT, escape_re=SQL_ESCAPE_RE)
 
 
 def escape_cratedb_literal(v: Any) -> Any:
@@ -45,8 +53,8 @@ def escape_cratedb_literal(v: Any) -> Any:
     CrateDB needs a slightly adjusted escaping of literals.
     Examples: "L'Aupillon" and "Pizzas d'Anarosa" from `sys.summits`.
 
-    It possibly also doesn't support the `E'` prefix as employed by the PostgreSQL escaper?
-    Fortunately, the Redshift escaper came to the rescue, providing a reasonable baseline.
+    Strings use the `E'` prefix like the PostgreSQL escaper, with the escapes CrateDB
+    decodes correctly, see `SQL_ESCAPE_DICT`.
 
     CrateDB also needs support when serializing container types ARRAY vs. OBJECT.
     """
