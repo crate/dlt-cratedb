@@ -115,12 +115,34 @@ class CrateDbClient(PostgresClient):
 
     def complete_load(self, load_id: str) -> None:
         """
-        Intercept to invoke a `REFRESH TABLE ...` statement.
+        Intercept to invoke `REFRESH TABLE ...` statements.
+
+        dlt restores pipeline state by joining `_dlt_pipeline_state` to `_dlt_loads`, so
+        both have to show this load's rows before the next run reads them back. The state
+        row is written before the load is marked complete, so its table is refreshed first:
+        a reader that sees this load in `_dlt_loads` also sees its state.
         """
+        self._refresh_state_table()
         result = super().complete_load(load_id=load_id)
         table_name = self.sql_client.make_qualified_table_name(self.schema.loads_table_name)
         self.sql_client.execute_sql(f"REFRESH TABLE {table_name}")
         return result
+
+    def _refresh_state_table(self) -> None:
+        """
+        Refresh the pipeline state table, when this schema syncs state.
+
+        The schema can list the table while the destination lacks it, for example after it
+        was dropped by hand: dlt skips DDL for a schema version it already stored. A load
+        that writes no new state row succeeded in that case before, so keep it succeeding.
+        """
+        if self.schema.state_table_name not in self.schema.tables:
+            return
+        table_name = self.sql_client.make_qualified_table_name(self.schema.state_table_name)
+        try:
+            self.sql_client.execute_sql(f"REFRESH TABLE {table_name}")
+        except DatabaseUndefinedRelation:
+            logger.debug("State table %s absent; nothing to refresh.", table_name)
 
     def _commit_schema_update(self, schema: Schema, schema_str: str) -> None:
         """

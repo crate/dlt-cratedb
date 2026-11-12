@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fixed incremental loads reloading data when a run restores its pipeline state from
+  CrateDB shortly after the previous load: `_dlt_pipeline_state` is now refreshed when a
+  load completes, like `_dlt_loads`, so the next run sees the state that load wrote.
 - Fixed every load that writes data failing on dlt 1.30 with "dlt cannot determine the data location
   of destination `cratedb`": the destination now reports its cluster address
   (`host:port`) as its data location, since CrateDB has no databases.
