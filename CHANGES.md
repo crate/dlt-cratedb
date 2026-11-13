@@ -11,6 +11,8 @@
   batch's keys are missing until the load is retried, and a retry converges for rows
   whose key values are not NULL. Concurrent loads into the same table are not supported.
 - Added the `scd2` merge strategy, previously run as a replace without history.
+  On dlt before 1.32, an `scd2` compound merge key is compared row by row, so retiring
+  records in a large table takes time that grows with its size times the batch size.
 - The `upsert`, `insert-only`, and `cdc` merge strategies now fail before loading,
   instead of running as a replace. dlt runs them as `MERGE INTO`, which CrateDB does not
   support, and CrateDB's `INSERT ... ON CONFLICT` needs a primary key, which the tables

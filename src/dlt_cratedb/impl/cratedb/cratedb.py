@@ -78,7 +78,8 @@ class CrateDbMergeJob(SqlMergeFollowupJob):
     - Queries see a table as of its last refresh, whichever connection wrote it,
       so staging, destination and temp tables are refreshed before they are read.
     - CrateDB cannot resolve the correlated `EXISTS` subquery dlt uses to select
-      the rows to delete, and has no tuple `IN`.
+      the rows to delete, and has no tuple `IN`. Rows are selected with non-correlated
+      subqueries instead, see `_gen_keys_in_staging`.
       -- https://github.com/crate/crate/issues/18107
     - CrateDB has no temporary tables. Nested chains use regular tables in the
       staging dataset instead, dropped at the end of the job.
@@ -123,24 +124,36 @@ class CrateDbMergeJob(SqlMergeFollowupJob):
         cls, primary_keys: Sequence[str], merge_keys: Sequence[str]
     ) -> List[str]:
         """
-        One non-correlated `IN` per key set, instead of dlt's correlated `EXISTS`.
-        A compound key is compared as one expression, see `gen_concat_sql`.
+        One non-correlated condition per key set, instead of dlt's correlated `EXISTS`.
 
-        The returned templates carry `{d}` and `{s}` aliases and the `{staging}` table name.
+        The returned templates carry the `{d}` alias of the destination table, and the
+        `{root}` and `{staging}` table names.
         """
         return [
-            f"{cls._gen_key_expr(keys, '{d}')} IN"
-            f" (SELECT {cls._gen_key_expr(keys, '{s}')} FROM {{staging}} AS {{s}})"
+            cls._gen_keys_in_staging(keys, "{d}", "{root}", "{staging}")
             for keys in (primary_keys, merge_keys)
             if keys
         ]
 
     @classmethod
-    def _gen_key_expr(cls, columns: Sequence[str], alias: str) -> str:
-        qualified = [f"{alias}.{column}" for column in columns]
-        if len(qualified) == 1:
-            return qualified[0]
-        return cls.gen_concat_sql(qualified)
+    def _gen_keys_in_staging(
+        cls, columns: Sequence[str], target: str, root: str, staging: str
+    ) -> str:
+        """
+        A condition on `target`, a row of the `root` table, that holds when its key is in
+        `staging`.
+
+        A single key column is compared with `IN`, which CrateDB looks up in its index.
+        CrateDB has no tuple `IN`, and evaluates an `IN` on an expression row by row, so a
+        compound key would cost destination rows times staged rows. Instead, an equi-join
+        selects the `root` rows whose key is staged, and `target` is compared by `_id`,
+        which every CrateDB row carries. The join matches no NULL key part, as `=` does on
+        PostgreSQL.
+        """
+        if len(columns) == 1:
+            return f"{target}.{columns[0]} IN (SELECT s.{columns[0]} FROM {staging} AS s)"
+        on = " AND ".join(f"r.{column} = s.{column}" for column in columns)
+        return f"{target}._id IN (SELECT r._id FROM {root} AS r JOIN {staging} AS s ON {on})"
 
     @classmethod
     def gen_key_table_clauses(  # type: ignore[override]
@@ -159,14 +172,19 @@ class CrateDbMergeJob(SqlMergeFollowupJob):
         the filter discards does not delete the destination row sharing its key.
         """
         key_clauses = cls._gen_key_table_clauses(*keys) if len(keys) == 2 else keys[0]
-        staging = staging_root_table_name
-        if source_filter:
-            # a derived table applies the filter, so its bare columns resolve only to staging
-            staging = f"(SELECT * FROM {staging_root_table_name} WHERE {source_filter})"
+        staging = cls._gen_staging_source(staging_root_table_name, source_filter)
         condition = " OR ".join(
-            clause.format(d="d", s="s", staging=staging) for clause in key_clauses
+            clause.format(d="d", s="s", root=root_table_name, staging=staging)
+            for clause in key_clauses
         )
         return [f"FROM {root_table_name} AS d WHERE {condition}"]
+
+    @classmethod
+    def _gen_staging_source(cls, staging_root_table_name: str, source_filter: Optional[str]) -> str:
+        if not source_filter:
+            return staging_root_table_name
+        # a derived table applies the filter, so its bare columns resolve only to staging
+        return f"(SELECT * FROM {staging_root_table_name} WHERE {source_filter})"
 
     @classmethod
     def _gen_keys_exist_in_staging_cond(
@@ -178,27 +196,28 @@ class CrateDbMergeJob(SqlMergeFollowupJob):
         source_filter: Optional[str] = None,
     ) -> str:
         """
-        One non-correlated `IN` on the encoded key, instead of dlt's correlated `EXISTS`.
+        The condition of `_gen_keys_in_staging`, instead of dlt's correlated `EXISTS`.
 
         dlt >= 1.32 selects destination rows by a compound merge key with this condition.
         The destination table has no alias, so its qualified name prefixes its columns.
 
-        `IN` is NULL where `EXISTS` is false, when a key part is NULL, and dlt negates the
-        condition to select absent rows. `COALESCE` keeps the negation true there.
+        A single-column `IN` is NULL where `EXISTS` is false, when the key is NULL, and dlt
+        negates the condition to select absent rows. `COALESCE` keeps the negation true there.
         """
         # what dlt's `gen_column_qualifier` returns, which dlt < 1.31 does not have
         qualifier = sql_client.make_qualified_table_name(table_name)
-        present = (
-            f"SELECT {cls._gen_key_expr(key_columns, 's')} FROM {staging_root_table_name} AS s"
-        )
-        if source_filter:
-            present += f" WHERE {source_filter}"
-        return f"COALESCE({cls._gen_key_expr(key_columns, qualifier)} IN ({present}), FALSE)"
+        staging = cls._gen_staging_source(staging_root_table_name, source_filter)
+        present = cls._gen_keys_in_staging(key_columns, qualifier, qualifier, staging)
+        return f"COALESCE({present}, FALSE)"
 
     @classmethod
     def gen_concat_sql(cls, columns: Sequence[str]) -> str:
         """
         Encode a compound key as one string, each part prefixed by its length.
+
+        dlt < 1.32 selects the destination rows of an `scd2` compound merge key by this
+        encoding. Merges with `delete-insert`, and `scd2` on later releases, use
+        `_gen_keys_in_staging`.
 
         The length prefix keeps a value from forging a column boundary, so `('a:b', 'c')`
         and `('a', 'b:c')` stay distinct. `char_length(NULL)` and `|| NULL` are NULL, so a

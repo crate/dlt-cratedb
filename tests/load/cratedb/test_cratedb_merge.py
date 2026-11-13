@@ -195,6 +195,21 @@ def test_merge_deduplicates_without_dedup_sort(pipeline: dlt.Pipeline) -> None:
     assert _rows(pipeline, "t", "id, v") == [(1, 1), (2, 2)]
 
 
+def test_merge_dedup_orders_by_typed_null(pipeline: dlt.Pipeline) -> None:
+    """The merge SQL orders by a typed NULL, whichever CrateDB runs the tests.
+
+    CrateDB 6.6 accepts the untyped `(SELECT NULL)`, so the load above passes there either way.
+    """
+    kwargs = {"table_name": "t", "write_disposition": "merge", "primary_key": "id"}
+    _run(pipeline, [{"id": 1, "v": 1}], **kwargs)
+
+    with pipeline.destination_client() as client:
+        table_chain = [client.prepare_load_table("t")]
+        sql = "\n".join(CrateDbMergeJob.generate_sql(table_chain, client.sql_client))
+    assert "ORDER BY (SELECT NULL::TEXT)" in sql
+    assert "(SELECT NULL)" not in sql
+
+
 def test_merge_compound_primary_key(pipeline: dlt.Pipeline) -> None:
     kwargs = {"table_name": "t", "write_disposition": "merge", "primary_key": ["id", "name"]}
     _run(pipeline, [{"id": 1, "name": "a", "v": 1}, {"id": 1, "name": "b", "v": 1}], **kwargs)
@@ -321,6 +336,32 @@ def test_merge_arrow_table(pipeline: dlt.Pipeline) -> None:
     _run(pipeline, pa.table({"id": [2, 3], "name": ["b2", "c"]}), **kwargs)
 
     assert _rows(pipeline, "t", "id, name") == [(1, "a"), (2, "b2"), (3, "c")]
+
+
+def test_merge_arrow_table_compound_key(pipeline: dlt.Pipeline) -> None:
+    """A compound key selects rows by CrateDB's `_id`, which Arrow input rows carry too."""
+    pa = pytest.importorskip("pyarrow")
+    kwargs = {"table_name": "t", "write_disposition": "merge", "primary_key": ["id", "k"]}
+    _run(pipeline, pa.table({"id": [1, 1, 2], "k": ["a", "b", "a"], "v": [1, 1, 1]}), **kwargs)
+    _run(pipeline, pa.table({"id": [1, 3], "k": ["b", "a"], "v": [2, 2]}), **kwargs)
+
+    assert _rows(pipeline, "t", "id, k, v") == [(1, "a", 1), (1, "b", 2), (2, "a", 1), (3, "a", 2)]
+
+
+def test_merge_compound_merge_key_null_part_never_matches(pipeline: dlt.Pipeline) -> None:
+    """A NULL part of a compound merge key matches nothing, as `=` on PostgreSQL."""
+    for v in (1, 2):
+        data = [{"a": 1, "b": None, "v": v}, {"a": 2, "b": "x", "v": v}]
+        resource = dlt.resource(
+            data,
+            name="t",
+            write_disposition="merge",
+            merge_key=["a", "b"],
+            columns={"b": {"data_type": "text", "nullable": True}},
+        )
+        _run(pipeline, resource)
+
+    assert _rows(pipeline, "t", "a, b, v") == [(1, None, 1), (1, None, 2), (2, "x", 2)]
 
 
 def test_merge_nested(pipeline: dlt.Pipeline) -> None:
