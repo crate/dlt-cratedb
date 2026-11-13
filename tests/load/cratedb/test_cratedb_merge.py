@@ -19,6 +19,7 @@ import psycopg2
 import pytest
 from dlt.common.configuration.container import Container
 from dlt.common.destination.exceptions import DestinationCapabilitiesException
+from dlt.common.schema import typing as schema_typing
 from dlt.common.schema.typing import MERGE_STRATEGIES
 from dlt.common.storages.load_package import LoadPackageStateInjectableContext
 from dlt.destinations.sql_jobs import SqlMergeFollowupJob
@@ -31,6 +32,11 @@ from dlt_cratedb.impl.cratedb.cratedb import CrateDbMergeJob
 
 SCD2 = {"disposition": "merge", "strategy": "scd2"}
 DELETE_INSERT = {"disposition": "merge", "strategy": "delete-insert"}
+
+needs_source_filter = pytest.mark.skipif(
+    "source_filter" not in getattr(schema_typing, "MERGE_DISPOSITION_HINTS", {}),
+    reason=f"dlt {dlt.__version__} has no `source_filter` merge option",
+)
 
 
 @pytest.fixture
@@ -333,6 +339,31 @@ def test_merge_nested(pipeline: dlt.Pipeline) -> None:
     assert leftovers == []
 
 
+@needs_source_filter
+@pytest.mark.parametrize("nested", [False, True], ids=["flat", "nested"])
+def test_merge_source_filter(pipeline: dlt.Pipeline, nested: bool) -> None:
+    """A row the source filter discards is not inserted, and does not delete the destination
+    row sharing its key."""
+
+    def resource(*rows: Tuple[int, str]) -> Any:
+        data = [
+            {"id": id_, "name": name, **({"tags": [name]} if nested else {})} for id_, name in rows
+        ]
+        return dlt.resource(
+            data,
+            name="t",
+            write_disposition={**DELETE_INSERT, "source_filter": "name <> 'skip'"},
+            primary_key="id",
+        )
+
+    _run(pipeline, resource((1, "a"), (2, "b")))
+    _run(pipeline, resource((1, "skip"), (2, "b2"), (3, "c"), (4, "skip")))
+
+    assert _rows(pipeline, "t", "id, name") == [(1, "a"), (2, "b2"), (3, "c")]
+    if nested:
+        assert _values(pipeline, "t__tags") == ["a", "b2", "c"]
+
+
 def test_merge_nested_hard_delete(pipeline: dlt.Pipeline) -> None:
     @dlt.resource(
         name="t",
@@ -449,6 +480,30 @@ def test_scd2_compound_merge_key(pipeline: dlt.Pipeline) -> None:
         (1, "x", 2, True),
         (1, "y", 1, True),
         (2, "y", 1, True),
+    ]
+
+
+@needs_source_filter
+@pytest.mark.parametrize("merge_key", ["k1", ["k1", "k2"]], ids=["merge_key", "compound_merge_key"])
+def test_scd2_source_filter(pipeline: dlt.Pipeline, merge_key: Any) -> None:
+    """A row the source filter discards is not inserted, and does not retire the active
+    versions sharing its merge key."""
+
+    def resource(*rows: Tuple[int, str, str]) -> Any:
+        return dlt.resource(
+            [{"k1": k1, "k2": k2, "v": v} for k1, k2, v in rows],
+            name="t",
+            write_disposition={**SCD2, "source_filter": "v <> 'skip'"},
+            merge_key=merge_key,
+        )
+
+    _run(pipeline, resource((1, "x", "a"), (2, "y", "a")))
+    _run(pipeline, resource((1, "x", "b"), (2, "y", "skip")))
+
+    assert _rows(pipeline, "t", "k1, k2, v, _dlt_valid_to IS NULL") == [
+        (1, "x", "a", False),
+        (1, "x", "b", True),
+        (2, "y", "a", True),
     ]
 
 

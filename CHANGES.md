@@ -4,12 +4,12 @@
 
 - Fixed `merge` replacing the whole table on CrateDB (GH-6): `delete-insert` now
   deletes the destination rows matching the batch by primary or merge key and inserts
-  the batch, keeping every other row. Nested tables, `hard_delete`, `dedup_sort`, and
-  compound keys are supported, and deduplicating by primary key works on CrateDB 6.2,
-  which rejects dlt's untyped `ORDER BY (SELECT NULL)` (GH-7). The merge is not
-  transactional: if it fails between the delete and the insert, the batch's keys are
-  missing until the load is retried, and a retry of a keyed merge converges.
-  Concurrent loads into the same table are not supported.
+  the batch, keeping every other row. Nested tables, `hard_delete`, `dedup_sort`,
+  `source_filter`, and compound keys are supported, and deduplicating by primary key
+  works on CrateDB 6.2, which rejects dlt's untyped `ORDER BY (SELECT NULL)` (GH-7).
+  The merge is not transactional: if it fails between the delete and the insert, the
+  batch's keys are missing until the load is retried, and a retry of a keyed merge
+  converges. Concurrent loads into the same table are not supported.
 - Added the `scd2` merge strategy, previously run as a replace without history.
 - The `upsert` and `insert-only` merge strategies now fail before loading, instead of
   running as a replace. They need a primary key constraint, which the tables dlt

@@ -149,14 +149,22 @@ class CrateDbMergeJob(SqlMergeFollowupJob):
         staging_root_table_name: str,
         *keys: Sequence[str],
         for_delete: bool,
+        source_filter: Optional[str] = None,
     ) -> List[str]:
         """
         dlt >= 1.18 passes `primary_keys, merge_keys`. Older releases pass the clauses
         rendered by `_gen_key_table_clauses`.
+
+        A `source_filter` limits the staged rows that select destination rows, so a row
+        the filter discards does not delete the destination row sharing its key.
         """
         key_clauses = cls._gen_key_table_clauses(*keys) if len(keys) == 2 else keys[0]
+        staging = staging_root_table_name
+        if source_filter:
+            # a derived table applies the filter, so its bare columns resolve only to staging
+            staging = f"(SELECT * FROM {staging_root_table_name} WHERE {source_filter})"
         condition = " OR ".join(
-            clause.format(d="d", s="s", staging=staging_root_table_name) for clause in key_clauses
+            clause.format(d="d", s="s", staging=staging) for clause in key_clauses
         )
         return [f"FROM {root_table_name} AS d WHERE {condition}"]
 
