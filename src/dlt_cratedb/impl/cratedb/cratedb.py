@@ -201,13 +201,18 @@ class CrateDbMergeJob(SqlMergeFollowupJob):
         dlt >= 1.32 selects destination rows by a compound merge key with this condition.
         The destination table has no alias, so its qualified name prefixes its columns.
 
-        A single-column `IN` is NULL where `EXISTS` is false, when the key is NULL, and dlt
-        negates the condition to select absent rows. `COALESCE` keeps the negation true there.
+        dlt negates the condition to select absent rows, so it has to be two-valued. The
+        compound form compares `_id`, which is never NULL, against a list of `_id` values,
+        so it is. Wrapping it in `COALESCE` would also stop CrateDB looking `_id` up in its
+        index, and cost destination rows times staged rows. A single-column `IN` is NULL
+        where `EXISTS` is false, when the key is NULL, so `COALESCE` keeps it two-valued.
         """
         # what dlt's `gen_column_qualifier` returns, which dlt < 1.31 does not have
         qualifier = sql_client.make_qualified_table_name(table_name)
         staging = cls._gen_staging_source(staging_root_table_name, source_filter)
         present = cls._gen_keys_in_staging(key_columns, qualifier, qualifier, staging)
+        if len(key_columns) > 1:
+            return present
         return f"COALESCE({present}, FALSE)"
 
     @classmethod

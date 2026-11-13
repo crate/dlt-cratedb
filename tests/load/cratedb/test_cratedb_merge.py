@@ -524,6 +524,46 @@ def test_scd2_compound_merge_key(pipeline: dlt.Pipeline) -> None:
     ]
 
 
+def test_scd2_compound_merge_key_values_cannot_collide(pipeline: dlt.Pipeline) -> None:
+    """Compound merge keys that read the same once joined must not retire each other.
+
+    dlt < 1.32 compares an `scd2` compound merge key as one string from `gen_concat_sql`.
+    """
+
+    def resource(data: List[Dict[str, Any]]) -> Any:
+        return dlt.resource(data, name="t", write_disposition=SCD2, merge_key=["a", "b"])
+
+    _run(
+        pipeline,
+        resource(
+            [
+                {"a": "ab", "b": "c", "v": "kept"},
+                {"a": "a\x1fb", "b": "c", "v": "kept"},
+                {"a": "p", "b": "q", "v": "old"},
+            ]
+        ),
+    )
+    _run(
+        pipeline,
+        resource(
+            [
+                {"a": "a", "b": "bc", "v": "new"},
+                {"a": "a", "b": "b\x1fc", "v": "new"},
+                {"a": "p", "b": "q", "v": "new"},
+            ]
+        ),
+    )
+
+    assert _rows(pipeline, "t", "a, b, v, _dlt_valid_to IS NULL") == [
+        ("a", "b\x1fc", "new", True),
+        ("a", "bc", "new", True),
+        ("a\x1fb", "c", "kept", True),
+        ("ab", "c", "kept", True),
+        ("p", "q", "new", True),
+        ("p", "q", "old", False),
+    ]
+
+
 @needs_source_filter
 @pytest.mark.parametrize("merge_key", ["k1", ["k1", "k2"]], ids=["merge_key", "compound_merge_key"])
 def test_scd2_source_filter(pipeline: dlt.Pipeline, merge_key: Any) -> None:
@@ -619,6 +659,8 @@ def test_compound_key_staging_cond_matches_exists(pipeline: dlt.Pipeline) -> Non
 
     assert select(cond) == {(1, "a")}
     assert select(f"NOT {cond}") == {(1, None), (3, "c")}
+    # `COALESCE` around `_id IN` would stop CrateDB using its `_id` index
+    assert "COALESCE" not in cond
 
 
 @pytest.mark.parametrize("strategy", ["upsert", "insert-only", "cdc"])
