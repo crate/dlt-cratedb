@@ -528,6 +528,7 @@ def test_scd2_compound_merge_key_values_cannot_collide(pipeline: dlt.Pipeline) -
     """Compound merge keys that read the same once joined must not retire each other.
 
     dlt < 1.32 compares an `scd2` compound merge key as one string from `gen_concat_sql`.
+    The pairs collide under plain concatenation, a `chr(31)` separator and a `:` separator.
     """
 
     def resource(data: List[Dict[str, Any]]) -> Any:
@@ -539,6 +540,7 @@ def test_scd2_compound_merge_key_values_cannot_collide(pipeline: dlt.Pipeline) -
             [
                 {"a": "ab", "b": "c", "v": "kept"},
                 {"a": "a\x1fb", "b": "c", "v": "kept"},
+                {"a": "a:b", "b": "c", "v": "kept"},
                 {"a": "p", "b": "q", "v": "old"},
             ]
         ),
@@ -549,6 +551,7 @@ def test_scd2_compound_merge_key_values_cannot_collide(pipeline: dlt.Pipeline) -
             [
                 {"a": "a", "b": "bc", "v": "new"},
                 {"a": "a", "b": "b\x1fc", "v": "new"},
+                {"a": "a", "b": "b:c", "v": "new"},
                 {"a": "p", "b": "q", "v": "new"},
             ]
         ),
@@ -556,8 +559,10 @@ def test_scd2_compound_merge_key_values_cannot_collide(pipeline: dlt.Pipeline) -
 
     assert _rows(pipeline, "t", "a, b, v, _dlt_valid_to IS NULL") == [
         ("a", "b\x1fc", "new", True),
+        ("a", "b:c", "new", True),
         ("a", "bc", "new", True),
         ("a\x1fb", "c", "kept", True),
+        ("a:b", "c", "kept", True),
         ("ab", "c", "kept", True),
         ("p", "q", "new", True),
         ("p", "q", "old", False),
