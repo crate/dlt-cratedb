@@ -71,6 +71,12 @@ class cratedb(postgres, Destination[CrateDbClientConfiguration, "CrateDbClient"]
         # CrateDB does not support `TRUNCATE TABLE`, use `DELETE FROM` instead.
         caps.supports_truncate_command = False
 
+        # dlt runs `upsert`, `insert-only` and `cdc` as `MERGE INTO`, which CrateDB does
+        # not support, and `INSERT ... ON CONFLICT` needs a primary key, which the tables
+        # dlt creates on CrateDB carry none of. Refuse them before loading.
+        # https://github.com/crate/dlt-cratedb/issues/64
+        caps.supported_merge_strategies = ["delete-insert", "scd2"]
+
         # CrateDB's type mapping needs adjustments compared to PostgreSQL.
         caps.type_mapper = CrateDbTypeMapper
 

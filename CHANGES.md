@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Fixed `merge` replacing the whole table on CrateDB (GH-6): `delete-insert` now
+  deletes the destination rows matching the batch by primary or merge key and inserts
+  the batch, keeping every other row. Nested tables, `hard_delete`, `dedup_sort`,
+  `source_filter`, and compound keys are supported, and deduplicating by primary key
+  works on CrateDB 6.2, which rejects dlt's untyped `ORDER BY (SELECT NULL)` (GH-7).
+  The merge is not transactional: if it fails between the delete and the insert, the
+  batch's keys are missing until the load is retried, and a retry converges for rows
+  whose key values are not NULL. Concurrent loads into the same table are not supported.
+- Added the `scd2` merge strategy, previously run as a replace without history.
+  `scd2` finds the records to retire and to insert with dlt's `NOT IN` on the row hash,
+  which CrateDB evaluates row by row, so a load into a large table takes time that
+  grows with its size times the batch size. On dlt before 1.32, a compound merge key
+  is compared row by row too.
+- The `upsert`, `insert-only`, and `cdc` merge strategies now fail before loading,
+  instead of running as a replace. dlt runs them as `MERGE INTO`, which CrateDB does not
+  support, and CrateDB's `INSERT ... ON CONFLICT` needs a primary key, which the tables
+  dlt creates on CrateDB do not carry (GH-64).
 - Fixed incremental loads reloading data when a run restores its pipeline state from
   CrateDB shortly after the previous load: `_dlt_pipeline_state` is now refreshed when a
   load completes, like `_dlt_loads`, so the next run sees the state that load wrote.

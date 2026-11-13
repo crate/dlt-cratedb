@@ -1,6 +1,6 @@
 # ruff: noqa: S608
 import logging
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from dlt.common.destination import DestinationCapabilitiesContext
 from dlt.common.destination.client import (
@@ -13,7 +13,8 @@ from dlt.destinations.exceptions import DatabaseUndefinedRelation
 from dlt.destinations.impl.postgres.postgres import PostgresClient
 from dlt.destinations.insert_job_client import InsertValuesJobClient
 from dlt.destinations.sql_client import SqlClientBase
-from dlt.destinations.sql_jobs import SqlStagingReplaceFollowupJob
+from dlt.destinations.sql_jobs import SqlMergeFollowupJob, SqlStagingReplaceFollowupJob
+from dlt.destinations.utils import get_deterministic_temp_table_name
 
 from dlt_cratedb.impl.cratedb.configuration import CrateDbClientConfiguration
 from dlt_cratedb.impl.cratedb.sql_client import CrateDbSqlClient
@@ -68,6 +69,227 @@ class CrateDbStagingReplaceJob(SqlStagingReplaceFollowupJob):
         return sql
 
 
+class CrateDbMergeJob(SqlMergeFollowupJob):
+    """
+    Run dlt's `delete-insert` and `scd2` merge SQL on CrateDB.
+
+    Overrides only the statements CrateDB cannot run as dlt emits them:
+
+    - Queries see a table as of its last refresh, whichever connection wrote it,
+      so staging, destination and temp tables are refreshed before they are read.
+    - CrateDB cannot resolve the correlated `EXISTS` subquery dlt uses to select
+      the rows to delete, and has no tuple `IN`. Rows are selected with non-correlated
+      subqueries instead, see `_gen_keys_in_staging`.
+      -- https://github.com/crate/crate/issues/18107
+    - CrateDB has no temporary tables. Nested chains use regular tables in the
+      staging dataset instead, dropped at the end of the job.
+    - CrateDB 6.2 rejects the untyped `(SELECT NULL)` dlt orders by when
+      deduplicating without a `dedup_sort` column.
+      -- https://github.com/crate/dlt-cratedb/issues/7
+
+    -- https://github.com/crate/dlt-cratedb/issues/6
+    """
+
+    @classmethod
+    def generate_sql(
+        cls,
+        table_chain: Sequence[PreparedTableSchema],
+        sql_client: SqlClientBase[Any],
+    ) -> List[str]:
+        """
+        Refresh the destination tables, so the merged data is queryable when the load returns.
+        """
+        sql = super().generate_sql(table_chain, sql_client)
+        for table in table_chain:
+            sql.append(f"REFRESH TABLE {sql_client.make_qualified_table_name(table['name'])};")
+        return sql
+
+    @classmethod
+    def _gen_table_setup_clauses(
+        cls,
+        table_chain: Sequence[PreparedTableSchema],
+        sql_client: SqlClientBase[Any],
+    ) -> List[str]:
+        """
+        Refresh staging and destination tables, so the merge sees the rows the load jobs
+        just wrote to staging, and destination rows written moments ago.
+        """
+        table_names: List[str] = []
+        for table in table_chain:
+            table_names.extend(sql_client.get_qualified_table_names(table["name"]))
+        return [f"REFRESH TABLE {', '.join(table_names)};"]
+
+    @classmethod
+    def _gen_key_table_clauses(
+        cls, primary_keys: Sequence[str], merge_keys: Sequence[str]
+    ) -> List[str]:
+        """
+        One non-correlated condition per key set, instead of dlt's correlated `EXISTS`.
+
+        The returned templates carry the `{d}` alias of the destination table, and the
+        `{root}` and `{staging}` table names.
+        """
+        return [
+            cls._gen_keys_in_staging(keys, "{d}", "{root}", "{staging}")
+            for keys in (primary_keys, merge_keys)
+            if keys
+        ]
+
+    @classmethod
+    def _gen_keys_in_staging(
+        cls, columns: Sequence[str], target: str, root: str, staging: str
+    ) -> str:
+        """
+        A condition on `target`, a row of the `root` table, that holds when its key is in
+        `staging`.
+
+        A single key column is compared with `IN`, which CrateDB looks up in its index.
+        CrateDB has no tuple `IN`, and evaluates an `IN` on an expression row by row, so a
+        compound key would cost destination rows times staged rows. Instead, an equi-join
+        selects the `root` rows whose key is staged, and `target` is compared by `_id`,
+        which every CrateDB row carries. The join matches no NULL key part, as `=` does on
+        PostgreSQL.
+        """
+        if len(columns) == 1:
+            return f"{target}.{columns[0]} IN (SELECT s.{columns[0]} FROM {staging} AS s)"
+        on = " AND ".join(f"r.{column} = s.{column}" for column in columns)
+        return f"{target}._id IN (SELECT r._id FROM {root} AS r JOIN {staging} AS s ON {on})"
+
+    @classmethod
+    def gen_key_table_clauses(  # type: ignore[override]
+        cls,
+        root_table_name: str,
+        staging_root_table_name: str,
+        *keys: Sequence[str],
+        for_delete: bool,
+        source_filter: Optional[str] = None,
+    ) -> List[str]:
+        """
+        dlt >= 1.18 passes `primary_keys, merge_keys`. Older releases pass the clauses
+        rendered by `_gen_key_table_clauses`.
+
+        A `source_filter` limits the staged rows that select destination rows, so a row
+        the filter discards does not delete the destination row sharing its key.
+        """
+        key_clauses = cls._gen_key_table_clauses(*keys) if len(keys) == 2 else keys[0]
+        staging = cls._gen_staging_source(staging_root_table_name, source_filter)
+        condition = " OR ".join(
+            clause.format(d="d", s="s", root=root_table_name, staging=staging)
+            for clause in key_clauses
+        )
+        return [f"FROM {root_table_name} AS d WHERE {condition}"]
+
+    @classmethod
+    def _gen_staging_source(cls, staging_root_table_name: str, source_filter: Optional[str]) -> str:
+        if not source_filter:
+            return staging_root_table_name
+        # a derived table applies the filter, so its bare columns resolve only to staging
+        return f"(SELECT * FROM {staging_root_table_name} WHERE {source_filter})"
+
+    @classmethod
+    def _gen_keys_exist_in_staging_cond(
+        cls,
+        table_name: str,
+        staging_root_table_name: str,
+        key_columns: Sequence[str],
+        sql_client: SqlClientBase[Any],
+        source_filter: Optional[str] = None,
+    ) -> str:
+        """
+        The condition of `_gen_keys_in_staging`, instead of dlt's correlated `EXISTS`.
+
+        dlt >= 1.32 selects destination rows by a compound merge key with this condition.
+        The destination table has no alias, so its qualified name prefixes its columns.
+
+        dlt negates the condition to select absent rows, so it has to be two-valued. The
+        compound form compares `_id`, which is never NULL, against a list of `_id` values,
+        so it is. Wrapping it in `COALESCE` would also stop CrateDB looking `_id` up in its
+        index, and cost destination rows times staged rows. A single-column `IN` is NULL
+        where `EXISTS` is false, when the key is NULL, so `COALESCE` keeps it two-valued.
+        """
+        # what dlt's `gen_column_qualifier` returns, which dlt < 1.31 does not have
+        qualifier = sql_client.make_qualified_table_name(table_name)
+        staging = cls._gen_staging_source(staging_root_table_name, source_filter)
+        present = cls._gen_keys_in_staging(key_columns, qualifier, qualifier, staging)
+        if len(key_columns) > 1:
+            return present
+        return f"COALESCE({present}, FALSE)"
+
+    @classmethod
+    def gen_concat_sql(cls, columns: Sequence[str]) -> str:
+        """
+        Encode a compound key as one string, each part prefixed by its length.
+
+        dlt < 1.32 selects the destination rows of an `scd2` compound merge key by this
+        encoding. Merges with `delete-insert`, and `scd2` on later releases, use
+        `_gen_keys_in_staging`.
+
+        The length prefix keeps a value from forging a column boundary, so `('a:b', 'c')`
+        and `('a', 'b:c')` stay distinct. `char_length(NULL)` and `|| NULL` are NULL, so a
+        NULL key part never matches, the same result `=` gives on PostgreSQL. dlt's
+        `CONCAT` reads NULL as an empty string.
+        """
+        return " || ".join(
+            f"char_length({column}::TEXT)::TEXT || ':' || {column}::TEXT" for column in columns
+        )
+
+    @classmethod
+    def default_order_by(cls) -> str:
+        """
+        CrateDB 6.2 cannot order by an untyped NULL.
+        -- https://github.com/crate/dlt-cratedb/issues/7
+        """
+        return "(SELECT NULL::TEXT)"
+
+    @classmethod
+    def gen_merge_sql(
+        cls,
+        table_chain: Sequence[PreparedTableSchema],
+        sql_client: SqlClientBase[Any],
+    ) -> List[str]:
+        """
+        Drop the temp tables at the end. Only nested chains create them.
+        """
+        sql = super().gen_merge_sql(table_chain, sql_client)
+        if len(table_chain) > 1:
+            root_table_name = table_chain[0]["name"]
+            for op in ("delete", "insert"):
+                temp_table_name = cls._new_temp_table_name(root_table_name, op, sql_client)
+                sql.append(f"DROP TABLE IF EXISTS {temp_table_name};")
+        return sql
+
+    @classmethod
+    def _new_temp_table_name(cls, table_name: str, op: str, sql_client: SqlClientBase[Any]) -> str:
+        """
+        A regular table in the staging dataset, named deterministically, so a table left
+        over by a failed load is dropped and recreated by the next one.
+        """
+        with sql_client.with_staging_dataset():
+            return sql_client.make_qualified_table_name(
+                cls._shorten_table_name(
+                    get_deterministic_temp_table_name(table_name, op), sql_client
+                )
+            )
+
+    @classmethod
+    def _to_temp_table(  # type: ignore[override]
+        cls,
+        select_sql: str,
+        temp_table_name: str,
+        unique_column: str,
+        sql_client: Optional[SqlClientBase[Any]] = None,
+    ) -> str:
+        """
+        CrateDB has no temporary tables. Refresh the new table, so the statements
+        consuming it see its rows.
+        """
+        return (
+            f"DROP TABLE IF EXISTS {temp_table_name};\n"
+            f"CREATE TABLE {temp_table_name} AS {select_sql};\n"
+            f"REFRESH TABLE {temp_table_name};"
+        )
+
+
 class CrateDbClient(PostgresClient):
     def __init__(
         self,
@@ -106,12 +328,10 @@ class CrateDbClient(PostgresClient):
         self, table_chain: Sequence[PreparedTableSchema]
     ) -> List[FollowupJobRequest]:
         """
-        CrateDB currently does not support "merge" followup jobs.
+        Merge with `CrateDbMergeJob`, which runs dlt's `delete-insert` and `scd2` SQL.
         -- https://github.com/crate/dlt-cratedb/issues/6
-
-        Workaround: Redirect the "merge" job to use a "replace" job instead.
         """
-        return [CrateDbStagingReplaceJob.from_table_chain(table_chain, self.sql_client)]
+        return [CrateDbMergeJob.from_table_chain(table_chain, self.sql_client)]
 
     def complete_load(self, load_id: str) -> None:
         """
