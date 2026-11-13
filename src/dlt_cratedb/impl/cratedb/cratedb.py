@@ -178,7 +178,8 @@ class CrateDbMergeJob(SqlMergeFollowupJob):
         `IN` is NULL where `EXISTS` is false, when a key part is NULL, and dlt negates the
         condition to select absent rows. `COALESCE` keeps the negation true there.
         """
-        qualifier = cls.gen_column_qualifier(table_name, sql_client)
+        # what dlt's `gen_column_qualifier` returns, which dlt < 1.31 does not have
+        qualifier = sql_client.make_qualified_table_name(table_name)
         present = (
             f"SELECT {cls._gen_key_expr(key_columns, 's')} FROM {staging_root_table_name} AS s"
         )
