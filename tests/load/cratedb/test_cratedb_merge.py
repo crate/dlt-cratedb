@@ -3,7 +3,7 @@ Integration tests for the `merge` write disposition.
 
 - `delete-insert` and `scd2` run as merges, not as a replace.
   https://github.com/crate/dlt-cratedb/issues/6
-- `upsert` and `insert-only` are refused before loading.
+- `upsert`, `insert-only` and `cdc` are refused before loading.
   https://github.com/crate/dlt-cratedb/issues/64
 - `merge` / `delete-insert` write dispositions and `refresh="drop_resources"` used to crash
   with `DestinationSchemaTampered` or
@@ -580,7 +580,7 @@ def test_compound_key_staging_cond_matches_exists(pipeline: dlt.Pipeline) -> Non
     assert select(f"NOT {cond}") == {(1, None), (3, "c")}
 
 
-@pytest.mark.parametrize("strategy", ["upsert", "insert-only"])
+@pytest.mark.parametrize("strategy", ["upsert", "insert-only", "cdc"])
 def test_merge_strategy_refused(pipeline: dlt.Pipeline, strategy: str) -> None:
     """Strategies CrateDB cannot run fail before anything is loaded."""
     if strategy not in MERGE_STRATEGIES:
